@@ -15,7 +15,7 @@ document.querySelector('#app').innerHTML = `
     <div class="card">
       <button id="counter" type="button"></button>
       <button id="keystore" type="button">Test Keystore</button>
-      <button id="fsread" type="button">Test FS Read</button>
+      <!-- <button id="fsread" type="button">Test FS Read</button> -->
     </div>
     <p class="read-the-docs">
       Click on the Vite logo to learn more
@@ -36,7 +36,7 @@ document.querySelector('#keystore').addEventListener('click', () => {
   console.log('Invoked keystore.get with id:', id);
 });
 
-document.querySelector('#fsread').addEventListener('click', () => {
-  const id = window.__native__.invoke('fs.read', JSON.stringify({ path: 'test.txt' }));
-  console.log('Invoked fs.read with id:', id);
-});
+// document.querySelector('#fsread').addEventListener('click', () => {
+//   const id = window.__native__.invoke('fs.read', JSON.stringify({ path: 'test.txt' }));
+//   console.log('Invoked fs.read with id:', id);
+// });

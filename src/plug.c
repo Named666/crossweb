@@ -1,6 +1,9 @@
+#include "config.h"
 #include "plug.h"
 #include "ipc.h"
-#include "plugins/fs/plugin.h"
+#ifdef CROSSWEB_PLUGIN_KEYSTORE
+#include "plugins/keystore/src/plugin.h"
+#endif
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -19,41 +22,6 @@ void plug_register(Plugin *plugin) {
     }
 }
 
-// Example core plugins - keystore remains built-in for now
-bool keystore_init(PluginContext *ctx) {
-    printf("Keystore plugin initialized\n");
-    return true;
-}
-
-bool keystore_invoke(const char *cmd, const char *payload, RespondCallback respond) {
-    // Simple in-memory keystore stub
-    printf("Keystore invoke: %s %s\n", cmd, payload);
-    char response[256];
-    if (strcmp(cmd, "get") == 0) {
-        snprintf(response, sizeof(response), "{\"data\":\"value for %s\"}", payload);
-    } else {
-        snprintf(response, sizeof(response), "{\"error\":\"unknown keystore command\"}");
-    }
-    respond(response);
-    return true;
-}
-
-void keystore_event(const char *event, const char *data) {
-    printf("Keystore event: %s %s\n", event, data);
-}
-
-void keystore_cleanup(void) {
-    printf("Keystore plugin cleanup\n");
-}
-
-static Plugin keystore_plugin = {
-    .name = "keystore",
-    .version = 100,
-    .init = keystore_init,
-    .invoke = keystore_invoke,
-    .event = keystore_event,
-    .cleanup = keystore_cleanup
-};
 
 bool plug_load(const char *path) {
     // TODO: Implement dynamic loading with dlopen/LoadLibrary
@@ -66,8 +34,9 @@ void plug_init(webview_t wv) {
         ipc_init(wv);  // Set up IPC listener
     }
     // Register built-in plugins
-    plug_register(&fs_plugin);
-    plug_register(&keystore_plugin);
+#ifdef CROSSWEB_PLUGIN_KEYSTORE
+    plug_register(&keystore_bio_plugin);
+#endif
 
     // Initialize all registered plugins
     PluginContext ctx = { .webview = wv, .platform = "unknown", .config = "{}" };  // TODO: detect platform

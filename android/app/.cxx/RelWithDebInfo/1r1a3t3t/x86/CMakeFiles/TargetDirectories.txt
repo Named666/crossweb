@@ -1,3 +1,0 @@
-C:/SAP/tests/webcross/musializer/android/app/.cxx/RelWithDebInfo/1r1a3t3t/x86/CMakeFiles/crossweb.dir
-C:/SAP/tests/webcross/musializer/android/app/.cxx/RelWithDebInfo/1r1a3t3t/x86/CMakeFiles/edit_cache.dir
-C:/SAP/tests/webcross/musializer/android/app/.cxx/RelWithDebInfo/1r1a3t3t/x86/CMakeFiles/rebuild_cache.dir

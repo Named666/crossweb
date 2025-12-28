@@ -46,7 +46,9 @@ class MainActivity : AppCompatActivity() {
         System.loadLibrary("crossweb")
 
         // Add JS interface
-        webView.addJavascriptInterface(Ipc(webView), "__native__")
+        val ipc = Ipc(webView)
+        ipc.setActivity(this)
+        webView.addJavascriptInterface(ipc, "__native__")
 
         // Load the local HTML file from assets folder via asset loader
         webView.loadUrl("https://appassets.androidplatform.net/index.html")

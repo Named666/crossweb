@@ -95,7 +95,7 @@ window.__native__.listen('fs.change', (data) => {
 - [ ] Implement permission system
 
 ### Phase 2: Core Plugins
-- [x] Keystore plugin (built-in)
+- [x] Keystore plugin
 - [ ] FS plugin implementation
 - [ ] Dialog plugin
 - [ ] HTTP plugin

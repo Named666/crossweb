@@ -1,4 +1,6 @@
-#define CONFIG_PATH "./build/config.h"
+#define CONFIG_PATH "./src/config.h"
+
+#include <ctype.h>
 
 typedef struct {
     const char *name;
@@ -12,7 +14,7 @@ static Feature_Flag feature_flags[] = {
         .macro = "CROSSWEB_HOTRELOAD",
         .name = "hotreload",
         .description = "Moves everything in src/plug.c to a separate \"DLL\" so it can be hotreloaded.",
-        .enabled_by_default = true,
+        .enabled_by_default = false,
     },
     {
         .macro = "CROSSWEB_UNBUNDLE",
@@ -32,7 +34,7 @@ static Target_Flag target_flags[] = {
     {
         .macro = "CROSSWEB_TARGET_WIN64_GCC",
         .name = "win64-gcc",
-        .enabled_by_default = true,
+        .enabled_by_default = false,
     },
     {
         .macro = "CROSSWEB_TARGET_WIN64_MSVC",
@@ -62,7 +64,7 @@ static Target_Flag target_flags[] = {
     {
         .macro = "CROSSWEB_TARGET_ANDROID",
         .name = "android",
-        .enabled_by_default = false,
+        .enabled_by_default = true,
     },
     {
         .macro = "CROSSWEB_TARGET_IOS",
@@ -102,6 +104,22 @@ bool generate_default_config(const char *file_path)
         }
     }
 
+    fprintf(f, "\n//// Plugins\n");
+    Nob_File_Paths plugins = {0};
+    if (nob_read_entire_dir("src/plugins", &plugins)) {
+        for (size_t i = 0; i < plugins.count; ++i) {
+            const char *plugin_name = plugins.items[i];
+            if (strcmp(plugin_name, ".") == 0 || strcmp(plugin_name, "..") == 0) continue;
+            char macro[256];
+            sprintf(macro, "CROSSWEB_PLUGIN_%s", plugin_name);
+            for (size_t j = strlen("CROSSWEB_PLUGIN_"); j < strlen(macro); ++j) {
+                macro[j] = toupper(macro[j]);
+            }
+            genf(f, "#define %s 1\n", macro);
+        }
+        da_free(plugins);
+    }
+
     fclose(f);
     return true;
 }
@@ -116,7 +134,7 @@ bool generate_config_logger(const char *file_path)
     }
 
     genf(f, "#include <stdio.h>\n");
-    genf(f, "#include \"../build/config.h\"\n");
+    genf(f, "#include \"../src/config.h\"\n");
     genf(f, "\n");
     genf(f, "int main(int argc, char **argv) {\n");
     genf(f, "    (void)argc; (void)argv;\n");
@@ -133,6 +151,27 @@ bool generate_config_logger(const char *file_path)
         genf(f, "    printf(\"  %s: disabled\\n\");\n", flag.name);
         genf(f, "#endif\n");
     }
+
+    genf(f, "\n    // Plugins\n");
+    Nob_File_Paths plugins = {0};
+    if (nob_read_entire_dir("src/plugins", &plugins)) {
+        for (size_t i = 0; i < plugins.count; ++i) {
+            const char *plugin_name = plugins.items[i];
+            if (strcmp(plugin_name, ".") == 0 || strcmp(plugin_name, "..") == 0) continue;
+            char macro[256];
+            sprintf(macro, "CROSSWEB_PLUGIN_%s", plugin_name);
+            for (size_t j = strlen("CROSSWEB_PLUGIN_"); j < strlen(macro); ++j) {
+                macro[j] = toupper(macro[j]);
+            }
+            genf(f, "#ifdef %s\n", macro);
+            genf(f, "    printf(\"  plugin-%s: enabled\\n\");\n", plugin_name);
+            genf(f, "#else\n");
+            genf(f, "    printf(\"  plugin-%s: disabled\\n\");\n", plugin_name);
+            genf(f, "#endif\n");
+        }
+        da_free(plugins);
+    }
+
     genf(f, "    return 0;\n");
     genf(f, "}\n");
 

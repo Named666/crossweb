@@ -4,6 +4,11 @@ import android.webkit.*
 import android.util.Log
 
 class Ipc(val webView: WebView) {
+        private var activity: android.app.Activity? = null
+
+        fun setActivity(act: android.app.Activity) {
+            activity = act
+        }
     @JavascriptInterface
     fun postMessage(message: String?) {
         message?.let { m ->

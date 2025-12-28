@@ -1,5 +1,0 @@
-# ninja log v5
-12	134	7885820269958910	CMakeFiles/crossweb.dir/plug.c.o	92eb22ab9b22d015
-23	139	7885820269968932	CMakeFiles/crossweb.dir/ipc.c.o	c72859215be7074f
-0	141	7885820270008905	CMakeFiles/crossweb.dir/android_bridge.c.o	cffc0ec0186ad579
-142	338	7885820271941263	C:/SAP/tests/webcross/musializer/android/app/build/intermediates/cxx/Debug/18296e21/obj/x86/libcrossweb.so	689264d383d82f23

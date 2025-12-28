@@ -113,6 +113,12 @@ JNIEXPORT void JNICALL Java_com_example_crossweb_CWebChromeClient_handleReceived
     // TODO: handle received title
 }
 
+bool android_keystore_bio_invoke(const char *cmd, const char *payload, RespondCallback respond) {
+    // Stub: keystore biometric is handled in Java layer via Ipc.invoke
+    respond("{\"ok\":false,\"msg\":\"Keystore handled in Java\"}");
+    return true;
+}
+
 JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
     JNIEnv *env;
     if ((*vm)->GetEnv(vm, (void **)&env, JNI_VERSION_1_6) != JNI_OK) {
