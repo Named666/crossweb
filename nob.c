@@ -259,6 +259,15 @@ int main(int argc, char **argv)
                 if (!cmd_run(&cmd)) return 1;
                 nob_log(INFO, "App launched");
                 return 0;
+            } else if (strcmp(subcommand, "install") == 0) {
+                Cmd cmd = {0};
+                cmd_append(&cmd, "adb");
+                cmd_append(&cmd, "install");
+                cmd_append(&cmd, "-r");
+                cmd_append(&cmd, "android/app/build/outputs/apk/release/app-release.apk");
+                if (!cmd_run(&cmd)) return 1;
+                nob_log(INFO, "APK installed");
+                return 0;
             } else {
                 nob_log(ERROR, "Unknown android subcommand `%s`", subcommand);
                 return 1;

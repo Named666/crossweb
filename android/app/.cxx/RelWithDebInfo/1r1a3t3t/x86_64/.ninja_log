@@ -8,3 +8,7 @@
 13	142	7885894314221391	CMakeFiles/crossweb.dir/android_bridge.c.o	1233be1ab5e46a05
 22	162	7885894314391518	CMakeFiles/crossweb.dir/plug.c.o	25da5598c721d361
 170	354	7885894316274200	C:/SAP/tests/webcross/musializer/android/app/build/intermediates/cxx/RelWithDebInfo/1r1a3t3t/obj/x86_64/libcrossweb.so	1cd74a88d349c7c6
+4	131	7885921228168973	CMakeFiles/crossweb.dir/ipc.c.o	6cbd30e18f3136
+15	155	7885921228509054	CMakeFiles/crossweb.dir/plug.c.o	25da5598c721d361
+25	159	7885921228529035	CMakeFiles/crossweb.dir/android_bridge.c.o	1233be1ab5e46a05
+160	337	7885921230306262	C:/SAP/tests/webcross/musializer/android/app/build/intermediates/cxx/RelWithDebInfo/1r1a3t3t/obj/x86_64/libcrossweb.so	1cd74a88d349c7c6
