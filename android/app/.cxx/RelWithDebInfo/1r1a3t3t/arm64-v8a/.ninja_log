@@ -1,15 +1,10 @@
 # ninja log v5
-42	561	7885886755747078	CMakeFiles/crossweb.dir/plug.c.o	24e739c3214d0bd4
-0	14	0	clean	d4b79b730648f00a
-11	452	7885886754396943	CMakeFiles/crossweb.dir/ipc.c.o	13e5d597813f831e
-4	154	7885888943306538	CMakeFiles/crossweb.dir/android_bridge.c.o	f9d173b6f475be21
-2	279	7885894279489889	build.ninja	161bc31f23f93029
-155	349	7885888945257507	C:/SAP/tests/webcross/musializer/android/app/build/intermediates/cxx/RelWithDebInfo/1r1a3t3t/obj/arm64-v8a/libcrossweb.so	4a4240a509648805
-3	126	7885894284834352	CMakeFiles/crossweb.dir/ipc.c.o	9676fb9c6590de8b
-14	157	7885894285157566	CMakeFiles/crossweb.dir/plug.c.o	a99b1559ae3fa05f
-25	167	7885894285228970	CMakeFiles/crossweb.dir/android_bridge.c.o	2170cc32636ddf33
-167	357	7885894287106133	C:/SAP/tests/webcross/musializer/android/app/build/intermediates/cxx/RelWithDebInfo/1r1a3t3t/obj/arm64-v8a/libcrossweb.so	4a4240a509648805
-3	151	7885921212937333	CMakeFiles/crossweb.dir/ipc.c.o	9676fb9c6590de8b
-23	180	7885921213230683	CMakeFiles/crossweb.dir/android_bridge.c.o	2170cc32636ddf33
-13	184	7885921213240700	CMakeFiles/crossweb.dir/plug.c.o	a99b1559ae3fa05f
-184	381	7885921215230293	C:/SAP/tests/webcross/musializer/android/app/build/intermediates/cxx/RelWithDebInfo/1r1a3t3t/obj/arm64-v8a/libcrossweb.so	4a4240a509648805
+15	224	7885987131043868	CMakeFiles/crossweb.dir/ipc.c.o	c802d899d3ff2868
+3	226	7885987131221651	CMakeFiles/crossweb.dir/android_bridge.c.o	4e8f77c1ad22dd1
+78	237	7885987131351465	CMakeFiles/crossweb.dir/plugins/fs/mobile.c.o	9f41461e4b8aaf8e
+27	229	7885987131250758	CMakeFiles/crossweb.dir/plugins/fs/commands.c.o	f514ca1ba038eb96
+51	185	7885987130535028	CMakeFiles/crossweb.dir/plugins/fs/error.c.o	59abd54b0d027c91
+39	273	7885987131681334	CMakeFiles/crossweb.dir/plug.c.o	4be2516642411034
+63	256	7885987131540582	CMakeFiles/crossweb.dir/plugins/fs/lib.c.o	b6d7f8245cc865a8
+34	179	7885962980859587	CMakeFiles/crossweb.dir/plugins/fs/desktop.c.o	2b98a1bfe37fca61
+4	262	7885989003217472	C:/SAP/tests/webcross/musializer/android/app/build/intermediates/cxx/RelWithDebInfo/1r1a3t3t/obj/arm64-v8a/libcrossweb.so	176ddf76eea9deac

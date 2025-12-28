@@ -1,14 +1,13 @@
 # ninja log v5
-137	330	7885888950527371	C:/SAP/tests/webcross/musializer/android/app/build/intermediates/cxx/RelWithDebInfo/1r1a3t3t/obj/armeabi-v7a/libcrossweb.so	ec6384fbdbfb9b8b
-3	136	7885888948606549	CMakeFiles/crossweb.dir/android_bridge.c.o	9f8dbaf6adaadd58
-5	324	7885886767303651	CMakeFiles/crossweb.dir/ipc.c.o	dffb54f61d64c06d
-0	15	0	clean	d4b79b730648f00a
-54	418	7885886768378607	CMakeFiles/crossweb.dir/plug.c.o	1580ac85a0257b28
-24	133	7885894294591847	CMakeFiles/crossweb.dir/ipc.c.o	40ca50b24a2f4fe3
-3	141	7885894294682403	CMakeFiles/crossweb.dir/android_bridge.c.o	2f00a9a9a10a1b03
-13	155	7885894294827427	CMakeFiles/crossweb.dir/plug.c.o	5c8a284eb27dc607
-164	352	7885894296731545	C:/SAP/tests/webcross/musializer/android/app/build/intermediates/cxx/RelWithDebInfo/1r1a3t3t/obj/armeabi-v7a/libcrossweb.so	ec6384fbdbfb9b8b
-21	132	7885921218059899	CMakeFiles/crossweb.dir/ipc.c.o	40ca50b24a2f4fe3
-12	148	7885921218231362	CMakeFiles/crossweb.dir/android_bridge.c.o	2f00a9a9a10a1b03
-3	154	7885921218241358	CMakeFiles/crossweb.dir/plug.c.o	5c8a284eb27dc607
 154	348	7885921220160547	C:/SAP/tests/webcross/musializer/android/app/build/intermediates/cxx/RelWithDebInfo/1r1a3t3t/obj/armeabi-v7a/libcrossweb.so	ec6384fbdbfb9b8b
+12	148	7885921218231362	CMakeFiles/crossweb.dir/android_bridge.c.o	2f00a9a9a10a1b03
+21	132	7885921218059899	CMakeFiles/crossweb.dir/ipc.c.o	40ca50b24a2f4fe3
+0	15	0	clean	d4b79b730648f00a
+3	154	7885921218241358	CMakeFiles/crossweb.dir/plug.c.o	5c8a284eb27dc607
+27	148	7885989011502021	CMakeFiles/crossweb.dir/plugins/fs/error.c.o	5408cc80b8ac6890
+16	226	7885989012269237	CMakeFiles/crossweb.dir/ipc.c.o	4c0abb790a567e65
+4	242	7885989012397437	CMakeFiles/crossweb.dir/android_bridge.c.o	35f131c9175af51b
+61	257	7885989012488813	CMakeFiles/crossweb.dir/plugins/fs/commands.c.o	65eb4b47606a498f
+38	272	7885989012564850	CMakeFiles/crossweb.dir/plugins/fs/lib.c.o	510e786882555782
+49	288	7885989012790761	CMakeFiles/crossweb.dir/plug.c.o	c8931464c20514c2
+288	547	7885989015613386	C:/SAP/tests/webcross/musializer/android/app/build/intermediates/cxx/RelWithDebInfo/1r1a3t3t/obj/armeabi-v7a/libcrossweb.so	30196b4815663657

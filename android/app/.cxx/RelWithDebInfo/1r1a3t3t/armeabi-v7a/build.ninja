@@ -50,28 +50,46 @@ cmake_ninja_workdir = C$:/SAP/tests/webcross/musializer/android/app/.cxx/RelWith
 build cmake_object_order_depends_target_crossweb: phony || CMakeFiles/crossweb.dir
 
 build CMakeFiles/crossweb.dir/android_bridge.c.o: C_COMPILER__crossweb_RelWithDebInfo C$:/SAP/tests/webcross/musializer/android/app/src/main/c/android_bridge.c || cmake_object_order_depends_target_crossweb
-  DEFINES = -DCROSSWEB_TARGET_ANDROID=1 -Dcrossweb_EXPORTS
+  DEFINES = -Dcrossweb_EXPORTS
   DEP_FILE = CMakeFiles\crossweb.dir\android_bridge.c.o.d
-  FLAGS = -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -march=armv7-a -mthumb -Wformat -Werror=format-security -std=c99 -O2 -g -DNDEBUG -fPIC -std=gnu99
-  INCLUDES = -IC:/SAP/tests/webcross/musializer/android/app/src/main/c/../../../../build
-  OBJECT_DIR = CMakeFiles\crossweb.dir
-  OBJECT_FILE_DIR = CMakeFiles\crossweb.dir
-
-build CMakeFiles/crossweb.dir/plug.c.o: C_COMPILER__crossweb_RelWithDebInfo C$:/SAP/tests/webcross/musializer/android/app/src/main/c/plug.c || cmake_object_order_depends_target_crossweb
-  DEFINES = -DCROSSWEB_TARGET_ANDROID=1 -Dcrossweb_EXPORTS
-  DEP_FILE = CMakeFiles\crossweb.dir\plug.c.o.d
-  FLAGS = -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -march=armv7-a -mthumb -Wformat -Werror=format-security -std=c99 -O2 -g -DNDEBUG -fPIC -std=gnu99
-  INCLUDES = -IC:/SAP/tests/webcross/musializer/android/app/src/main/c/../../../../build
+  FLAGS = -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -march=armv7-a -mthumb -Wformat -Werror=format-security -std=c99 -O2 -g -DNDEBUG -fPIC
   OBJECT_DIR = CMakeFiles\crossweb.dir
   OBJECT_FILE_DIR = CMakeFiles\crossweb.dir
 
 build CMakeFiles/crossweb.dir/ipc.c.o: C_COMPILER__crossweb_RelWithDebInfo C$:/SAP/tests/webcross/musializer/android/app/src/main/c/ipc.c || cmake_object_order_depends_target_crossweb
-  DEFINES = -DCROSSWEB_TARGET_ANDROID=1 -Dcrossweb_EXPORTS
+  DEFINES = -Dcrossweb_EXPORTS
   DEP_FILE = CMakeFiles\crossweb.dir\ipc.c.o.d
-  FLAGS = -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -march=armv7-a -mthumb -Wformat -Werror=format-security -std=c99 -O2 -g -DNDEBUG -fPIC -std=gnu99
-  INCLUDES = -IC:/SAP/tests/webcross/musializer/android/app/src/main/c/../../../../build
+  FLAGS = -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -march=armv7-a -mthumb -Wformat -Werror=format-security -std=c99 -O2 -g -DNDEBUG -fPIC
   OBJECT_DIR = CMakeFiles\crossweb.dir
   OBJECT_FILE_DIR = CMakeFiles\crossweb.dir
+
+build CMakeFiles/crossweb.dir/plug.c.o: C_COMPILER__crossweb_RelWithDebInfo C$:/SAP/tests/webcross/musializer/android/app/src/main/c/plug.c || cmake_object_order_depends_target_crossweb
+  DEFINES = -Dcrossweb_EXPORTS
+  DEP_FILE = CMakeFiles\crossweb.dir\plug.c.o.d
+  FLAGS = -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -march=armv7-a -mthumb -Wformat -Werror=format-security -std=c99 -O2 -g -DNDEBUG -fPIC
+  OBJECT_DIR = CMakeFiles\crossweb.dir
+  OBJECT_FILE_DIR = CMakeFiles\crossweb.dir
+
+build CMakeFiles/crossweb.dir/plugins/fs/commands.c.o: C_COMPILER__crossweb_RelWithDebInfo C$:/SAP/tests/webcross/musializer/android/app/src/main/c/plugins/fs/commands.c || cmake_object_order_depends_target_crossweb
+  DEFINES = -Dcrossweb_EXPORTS
+  DEP_FILE = CMakeFiles\crossweb.dir\plugins\fs\commands.c.o.d
+  FLAGS = -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -march=armv7-a -mthumb -Wformat -Werror=format-security -std=c99 -O2 -g -DNDEBUG -fPIC
+  OBJECT_DIR = CMakeFiles\crossweb.dir
+  OBJECT_FILE_DIR = CMakeFiles\crossweb.dir\plugins\fs
+
+build CMakeFiles/crossweb.dir/plugins/fs/error.c.o: C_COMPILER__crossweb_RelWithDebInfo C$:/SAP/tests/webcross/musializer/android/app/src/main/c/plugins/fs/error.c || cmake_object_order_depends_target_crossweb
+  DEFINES = -Dcrossweb_EXPORTS
+  DEP_FILE = CMakeFiles\crossweb.dir\plugins\fs\error.c.o.d
+  FLAGS = -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -march=armv7-a -mthumb -Wformat -Werror=format-security -std=c99 -O2 -g -DNDEBUG -fPIC
+  OBJECT_DIR = CMakeFiles\crossweb.dir
+  OBJECT_FILE_DIR = CMakeFiles\crossweb.dir\plugins\fs
+
+build CMakeFiles/crossweb.dir/plugins/fs/lib.c.o: C_COMPILER__crossweb_RelWithDebInfo C$:/SAP/tests/webcross/musializer/android/app/src/main/c/plugins/fs/lib.c || cmake_object_order_depends_target_crossweb
+  DEFINES = -Dcrossweb_EXPORTS
+  DEP_FILE = CMakeFiles\crossweb.dir\plugins\fs\lib.c.o.d
+  FLAGS = -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -march=armv7-a -mthumb -Wformat -Werror=format-security -std=c99 -O2 -g -DNDEBUG -fPIC
+  OBJECT_DIR = CMakeFiles\crossweb.dir
+  OBJECT_FILE_DIR = CMakeFiles\crossweb.dir\plugins\fs
 
 
 # =============================================================================
@@ -81,7 +99,7 @@ build CMakeFiles/crossweb.dir/ipc.c.o: C_COMPILER__crossweb_RelWithDebInfo C$:/S
 #############################################
 # Link the shared library C:\SAP\tests\webcross\musializer\android\app\build\intermediates\cxx\RelWithDebInfo\1r1a3t3t\obj\armeabi-v7a\libcrossweb.so
 
-build C$:/SAP/tests/webcross/musializer/android/app/build/intermediates/cxx/RelWithDebInfo/1r1a3t3t/obj/armeabi-v7a/libcrossweb.so: C_SHARED_LIBRARY_LINKER__crossweb_RelWithDebInfo CMakeFiles/crossweb.dir/android_bridge.c.o CMakeFiles/crossweb.dir/plug.c.o CMakeFiles/crossweb.dir/ipc.c.o | C$:/Users/ruizx/AppData/Local/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/windows-x86_64/sysroot/usr/lib/arm-linux-androideabi/24/liblog.so
+build C$:/SAP/tests/webcross/musializer/android/app/build/intermediates/cxx/RelWithDebInfo/1r1a3t3t/obj/armeabi-v7a/libcrossweb.so: C_SHARED_LIBRARY_LINKER__crossweb_RelWithDebInfo CMakeFiles/crossweb.dir/android_bridge.c.o CMakeFiles/crossweb.dir/ipc.c.o CMakeFiles/crossweb.dir/plug.c.o CMakeFiles/crossweb.dir/plugins/fs/commands.c.o CMakeFiles/crossweb.dir/plugins/fs/error.c.o CMakeFiles/crossweb.dir/plugins/fs/lib.c.o | C$:/Users/ruizx/AppData/Local/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/windows-x86_64/sysroot/usr/lib/arm-linux-androideabi/24/liblog.so
   LANGUAGE_COMPILE_FLAGS = -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -march=armv7-a -mthumb -Wformat -Werror=format-security -std=c99 -O2 -g -DNDEBUG
   LINK_FLAGS = -static-libstdc++ -Wl,--build-id=sha1 -Wl,--no-rosegment -Wl,--no-undefined-version -Wl,--fatal-warnings -Wl,--no-undefined -Qunused-arguments  -Wl,--gc-sections
   LINK_LIBRARIES = C:/Users/ruizx/AppData/Local/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/windows-x86_64/sysroot/usr/lib/arm-linux-androideabi/24/liblog.so  -latomic -lm

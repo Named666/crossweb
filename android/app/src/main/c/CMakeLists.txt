@@ -1,22 +1,24 @@
-cmake_minimum_required(VERSION 3.10.2)
+cmake_minimum_required(VERSION 3.4.1)
+project(crossweb C)
 
-project("crossweb" C)
-
-# Set C standard to C99
-set(CMAKE_C_STANDARD 99)
-set(CMAKE_C_STANDARD_REQUIRED ON)
-
-# Include directories
-include_directories("../../../../build")
-# Define for Android
-add_definitions(-DCROSSWEB_TARGET_ANDROID=1)
-
-add_library(crossweb SHARED
-    android_bridge.c
-    plug.c
-    ipc.c
+# Add your native source files here
+add_library(
+	crossweb
+	SHARED
+	android_bridge.c
+	ipc.c
+	plug.c
+	plugins/fs/commands.c
+	plugins/fs/error.c
+	plugins/fs/lib.c
 )
 
-find_library(log-lib log)
-
-target_link_libraries(crossweb ${log-lib})
+# Link against Android log library
+find_library(
+	log-lib
+	log
+)
+target_link_libraries(
+	crossweb
+	${log-lib}
+)

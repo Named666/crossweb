@@ -1,0 +1,12 @@
+{
+  "fs.read": {
+    "description": "Read files from the file system",
+    "default": "deny",
+    "scopes": ["read"]
+  },
+  "fs.write": {
+    "description": "Write files to the file system",
+    "default": "deny",
+    "scopes": ["write"]
+  }
+}

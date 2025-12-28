@@ -15,7 +15,11 @@ bool build_crossweb(void)
     cmd_append(&cmd, "-o", "./build/libplug.dll");
     cmd_append(&cmd,
         "./src/plug.c",
-        "./src/ipc.c");
+        "./src/ipc.c",
+        "./src/plugins/fs/lib.c",
+        "./src/plugins/fs/commands.c",
+        "./src/plugins/fs/desktop.c",
+        "./src/plugins/fs/error.c");
     cmd_append(&cmd, "-lole32", "-loleaut32");
     if (!cmd_run(&cmd, .async = &procs)) return_defer(false);
 
@@ -36,7 +40,11 @@ bool build_crossweb(void)
     cmd_append(&cmd,
         "./src/plug.c",
         "./src/ipc.c",
-        "./src/hotreload_windows.c");
+        "./src/hotreload_windows.c",
+        "./src/plugins/fs/lib.c",
+        "./src/plugins/fs/commands.c",
+        "./src/plugins/fs/desktop.c",
+        "./src/plugins/fs/error.c");
     cmd_append(&cmd, "-lole32", "-loleaut32", "-ladvapi32");
     if (!cmd_run(&cmd)) return_defer(false);
 #endif // CROSSWEB_HOTRELOAD

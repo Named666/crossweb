@@ -20,7 +20,18 @@ bool build_crossweb(void)
     if (!copy_file("src/plug.h", "android/app/src/main/c/plug.h")) return false;
     if (!copy_file("src/ipc.h", "android/app/src/main/c/ipc.h")) return false;
 
-    // Create assets dir and copy web files
+    // Copy plugin files
+    if (!mkdir_if_not_exists("android/app/src/main/c/plugins")) return false;
+    if (!mkdir_if_not_exists("android/app/src/main/c/plugins/fs")) return false;
+    if (!copy_file("src/plugins/fs/lib.c", "android/app/src/main/c/plugins/fs/lib.c")) return false;
+    if (!copy_file("src/plugins/fs/commands.c", "android/app/src/main/c/plugins/fs/commands.c")) return false;
+    if (!copy_file("src/plugins/fs/commands.h", "android/app/src/main/c/plugins/fs/commands.h")) return false;
+    if (!copy_file("src/plugins/fs/desktop.c", "android/app/src/main/c/plugins/fs/desktop.c")) return false;
+    if (!copy_file("src/plugins/fs/mobile.c", "android/app/src/main/c/plugins/fs/mobile.c")) return false;
+    if (!copy_file("src/plugins/fs/error.c", "android/app/src/main/c/plugins/fs/error.c")) return false;
+    if (!copy_file("src/plugins/fs/error.h", "android/app/src/main/c/plugins/fs/error.h")) return false;
+    if (!copy_file("src/plugins/fs/models.h", "android/app/src/main/c/plugins/fs/models.h")) return false;
+    if (!copy_file("src/plugins/fs/plugin.h", "android/app/src/main/c/plugins/fs/plugin.h")) return false;
     if (!mkdir_if_not_exists("android/app/src/main/assets")) return false;
     Nob_Cmd copy_cmd = {0};
     nob_cmd_append(&copy_cmd, "xcopy");
@@ -66,7 +77,18 @@ bool build_dist(void)
     if (!copy_file("src/hotreload.h", "android/app/src/main/c/hotreload.h")) return false;
     if (!copy_file("src/hotreload_posix.c", "android/app/src/main/c/hotreload_posix.c")) return false;
 
-    // Create assets dir and copy web files
+    // Copy plugin files
+    if (!mkdir_if_not_exists("android/app/src/main/c/plugins")) return false;
+    if (!mkdir_if_not_exists("android/app/src/main/c/plugins/fs")) return false;
+    if (!copy_file("src/plugins/fs/lib.c", "android/app/src/main/c/plugins/fs/lib.c")) return false;
+    if (!copy_file("src/plugins/fs/commands.c", "android/app/src/main/c/plugins/fs/commands.c")) return false;
+    if (!copy_file("src/plugins/fs/commands.h", "android/app/src/main/c/plugins/fs/commands.h")) return false;
+    if (!copy_file("src/plugins/fs/desktop.c", "android/app/src/main/c/plugins/fs/desktop.c")) return false;
+    if (!copy_file("src/plugins/fs/mobile.c", "android/app/src/main/c/plugins/fs/mobile.c")) return false;
+    if (!copy_file("src/plugins/fs/error.c", "android/app/src/main/c/plugins/fs/error.c")) return false;
+    if (!copy_file("src/plugins/fs/error.h", "android/app/src/main/c/plugins/fs/error.h")) return false;
+    if (!copy_file("src/plugins/fs/models.h", "android/app/src/main/c/plugins/fs/models.h")) return false;
+    if (!copy_file("src/plugins/fs/plugin.h", "android/app/src/main/c/plugins/fs/plugin.h")) return false;
     if (!mkdir_if_not_exists("android/app/src/main/assets")) return false;
     Nob_Cmd copy_cmd = {0};
     nob_cmd_append(&copy_cmd, "xcopy");

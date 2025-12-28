@@ -205,6 +205,17 @@ int main(int argc, char **argv)
                 if (!copy_file("src/ipc.c", "android/app/src/main/c/ipc.c")) return 1;
                 if (!copy_file("src/plug.h", "android/app/src/main/c/plug.h")) return 1;
                 if (!copy_file("src/ipc.h", "android/app/src/main/c/ipc.h")) return 1;
+                // Copy plugin files
+                if (!mkdir_if_not_exists("android/app/src/main/c/plugins")) return 1;
+                if (!mkdir_if_not_exists("android/app/src/main/c/plugins/fs")) return 1;
+                if (!copy_file("src/plugins/fs/lib.c", "android/app/src/main/c/plugins/fs/lib.c")) return 1;
+                if (!copy_file("src/plugins/fs/commands.c", "android/app/src/main/c/plugins/fs/commands.c")) return 1;
+                if (!copy_file("src/plugins/fs/commands.h", "android/app/src/main/c/plugins/fs/commands.h")) return 1;
+                if (!copy_file("src/plugins/fs/mobile.c", "android/app/src/main/c/plugins/fs/mobile.c")) return 1;
+                if (!copy_file("src/plugins/fs/error.c", "android/app/src/main/c/plugins/fs/error.c")) return 1;
+                if (!copy_file("src/plugins/fs/error.h", "android/app/src/main/c/plugins/fs/error.h")) return 1;
+                if (!copy_file("src/plugins/fs/models.h", "android/app/src/main/c/plugins/fs/models.h")) return 1;
+                if (!copy_file("src/plugins/fs/plugin.h", "android/app/src/main/c/plugins/fs/plugin.h")) return 1;
                 // Build release
                 cmd = (Cmd){0};
                 cmd_append(&cmd, "cmd");

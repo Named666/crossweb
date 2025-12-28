@@ -2,17 +2,30 @@
 #define PLUG_H_
 
 #include <stddef.h>
+#include <stdbool.h>
 typedef void* webview_t;
 
 typedef void (*RespondCallback)(const char *response);
 
+typedef struct PluginContext {
+    webview_t webview;
+    const char *platform;  // "android", "ios", "windows", "macos", "linux"
+    const char *config;    // JSON config string
+} PluginContext;
+
 typedef struct Plugin {
-    const char *name;
-    void (*invoke)(const char *cmd, const char *payload, RespondCallback respond);
+    const char *name;      // Plugin identifier (e.g., "fs", "dialog")
+    int version;           // Semantic version (e.g., 100 for 1.0.0)
+    bool (*init)(PluginContext *ctx);  // Initialize plugin, return true on success
+    bool (*invoke)(const char *command, const char *payload, RespondCallback respond);  // Handle commands
+    void (*event)(const char *event, const char *data);  // Handle events
+    void (*cleanup)(void);  // Cleanup resources
 } Plugin;
 
 #define LIST_OF_PLUGS \
     PLUG(plug_init, void, webview_t) \
+    PLUG(plug_register, void, Plugin*) \
+    PLUG(plug_load, bool, const char*) \
     PLUG(plug_pre_reload, void*, void) \
     PLUG(plug_post_reload, void, void*) \
     PLUG(plug_load_resource, void*, const char*, size_t*) \
