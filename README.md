@@ -27,33 +27,22 @@ CrossWeb is a cross-platform webview framework inspired by Tauri 2.0, built enti
 - macOS (planned)
 - Mobile (iOS/Android stubs)
 
-## Download Binaries
-
-- Windows MSVC: [crossweb-alpha1-win64-msvc.zip](https://github.com/your-repo/crossweb/releases/download/alpha1/crossweb-alpha1-win64-msvc.zip)
-- Windows MinGW: [crossweb-alpha1-win64-mingw.zip](https://github.com/your-repo/crossweb/releases/download/alpha1/crossweb-alpha1-win64-mingw.zip)
 
 ## Build from Source
 
 We are using Custom Build System written entirely in C called `nob`. [nob.c](./nob.c) is the program that builds CrossWeb. For more info on this Build System see the [nob.h repo](https://github.com/tsoding/nob.h).
 
-Before using `nob` you need to bootstrap it. Just compile it with the available C compiler. On Linux it's usually `$ cc -o nob nob.c` on Windows with MSVC from within `vcvarsall.bat` it's `$ cl.exe nob.c`. You only need to boostrap it once. After the bootstrap you can just keep running the same executable over and over again. It even tries to rebuild itself if you modify [nob.c](./nob.c) (which may fail sometimes, so in that case be ready to reboostrap it).
+Before using `nob` you need to bootstrap it. Just compile it with the available C compiler. On Linux it's usually `$ cc -o nob nob.c` on Windows with GCC it's `cc nob.c -g nob.exe`. You only need to boostrap it once. After the bootstrap you can just keep running the same executable over and over again. It even tries to rebuild itself if you modify [nob.c](./nob.c) (which may fail sometimes, so in that case be ready to reboostrap it).
 
 I really recommend to read [nob.c](./nob.c) and [nob.h](https://github.com/tsoding/nob.h) to get an idea of how it all actually works. The Build System is a work in progress, so if something breaks be ready to dive into it.
 
-### Windows MSVC
+### Windows GCC
 
 ```console
-$ cl.exe nob.c  # ONLY ONCE!!!
-$ .\nob
+$ gcc nob.c -o nob.exe  # ONLY ONCE!!!
+$ ./nob.exe
 ```
-
-### Windows MinGW
-
-```console
-$ gcc nob.c -o nob  # ONLY ONCE!!!
-$ ./nob
-```
-$ ./build/crossweb
+$ ./build/crossweb.exe
 ```
 
 ## Usage
