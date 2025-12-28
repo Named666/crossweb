@@ -2,4 +2,5 @@
 <full-backup-content>
     <!-- TODO: Use <include> for each domain to be included -->
     <exclude domain="sharedpref" path="."/>
+    <exclude domain="file" path="datastore/"/>
 </full-backup-content>

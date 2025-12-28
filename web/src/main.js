@@ -43,6 +43,9 @@ window.__native__.onMessage = function(id, result) {
     if (cmd === 'keystore.encrypt' && result.ok) {
       encryptedData = result.encrypted;
     }
+    if (cmd === 'keystore.load' && result.ok) {
+      encryptedData = result.encrypted;
+    }
   }
 };
 

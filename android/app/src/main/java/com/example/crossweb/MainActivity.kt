@@ -37,6 +37,14 @@ class MainActivity : AppCompatActivity() {
 
         // Important: enables JavaScript (if your HTML needs it)
         webView.settings.javaScriptEnabled = true
+        webView.settings.safeBrowsingEnabled = false
+
+        // Disable caching and storage to minimize data usage
+        webView.settings.cacheMode = WebSettings.LOAD_NO_CACHE
+        webView.settings.databaseEnabled = false
+        webView.settings.domStorageEnabled = false
+        webView.clearCache(true)
+        webView.clearHistory()
 
         // Set up asset loader for local assets
         val assetLoader = WebViewAssetLoader.Builder()

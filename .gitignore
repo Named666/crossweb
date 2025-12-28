@@ -18,10 +18,7 @@ nob.obj
 
 # Android artifacts
 android/app/build/
-android/.gradle/
-android/app/.cxx/
-android/app/src/assets
-android/app/src/main/c
-
-# Gradle folders
-.gradle/
+**/.gradle/
+**/.cxx/
+android/app/src/assets/
+android/app/src/main/c/

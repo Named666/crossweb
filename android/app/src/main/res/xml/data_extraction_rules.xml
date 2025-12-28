@@ -3,9 +3,6 @@
     <cloud-backup>
         <!-- TODO: Use <include> for each domain to be included -->
         <exclude domain="sharedpref" path="."/>
+        <exclude domain="file" path="datastore/"/>
     </cloud-backup>
-    <!-- Device transfers are opt-in, so this currently has no effect -->
-    <device-transfer>
-        <exclude domain="sharedpref" path="."/>
-    </device-transfer>
 </data-extraction-rules>
