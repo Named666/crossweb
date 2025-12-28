@@ -8,6 +8,8 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 
 # Include directories
 include_directories("../../../../build")
+# Define for Android
+add_definitions(-DCROSSWEB_TARGET_ANDROID=1)
 
 add_library(crossweb SHARED
     android_bridge.c

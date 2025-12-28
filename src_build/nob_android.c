@@ -2,6 +2,17 @@
 
 bool build_crossweb(void)
 {
+    // Build web assets
+    Nob_Cmd build_cmd = {0};
+    nob_cmd_append(&build_cmd, "cd");
+    nob_cmd_append(&build_cmd, "web");
+    nob_cmd_append(&build_cmd, "&&");
+    nob_cmd_append(&build_cmd, "npm");
+    nob_cmd_append(&build_cmd, "run");
+    nob_cmd_append(&build_cmd, "build");
+    if (!nob_cmd_run_sync(build_cmd)) return false;
+    nob_cmd_free(build_cmd);
+
     // Copy C source files to Android c dir
     if (!copy_file("src/android_bridge.c", "android/app/src/main/c/android_bridge.c")) return false;
     if (!copy_file("src/plug.c", "android/app/src/main/c/plug.c")) return false;
@@ -16,7 +27,7 @@ bool build_crossweb(void)
     nob_cmd_append(&copy_cmd, "/E");
     nob_cmd_append(&copy_cmd, "/I");
     nob_cmd_append(&copy_cmd, "/Y");
-    nob_cmd_append(&copy_cmd, "web");
+    nob_cmd_append(&copy_cmd, "web\\dist");
     nob_cmd_append(&copy_cmd, "android\\app\\src\\main\\assets\\");
     if (!nob_cmd_run_sync(copy_cmd)) return false;
     nob_cmd_free(copy_cmd);
@@ -35,6 +46,17 @@ bool build_crossweb(void)
 
 bool build_dist(void)
 {
+    // Build web assets
+    Nob_Cmd build_cmd = {0};
+    nob_cmd_append(&build_cmd, "cd");
+    nob_cmd_append(&build_cmd, "web");
+    nob_cmd_append(&build_cmd, "&&");
+    nob_cmd_append(&build_cmd, "npm");
+    nob_cmd_append(&build_cmd, "run");
+    nob_cmd_append(&build_cmd, "build");
+    if (!nob_cmd_run_sync(build_cmd)) return false;
+    nob_cmd_free(build_cmd);
+
     // Copy C source files to Android c dir
     if (!copy_file("src/android_bridge.c", "android/app/src/main/c/android_bridge.c")) return false;
     if (!copy_file("src/plug.c", "android/app/src/main/c/plug.c")) return false;
@@ -51,7 +73,7 @@ bool build_dist(void)
     nob_cmd_append(&copy_cmd, "/E");
     nob_cmd_append(&copy_cmd, "/I");
     nob_cmd_append(&copy_cmd, "/Y");
-    nob_cmd_append(&copy_cmd, "web");
+    nob_cmd_append(&copy_cmd, "web\\dist");
     nob_cmd_append(&copy_cmd, "android\\app\\src\\main\\assets\\");
     if (!nob_cmd_run_sync(copy_cmd)) return false;
     nob_cmd_free(copy_cmd);

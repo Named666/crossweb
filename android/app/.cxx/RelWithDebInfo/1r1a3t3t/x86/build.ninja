@@ -50,7 +50,7 @@ cmake_ninja_workdir = C$:/SAP/tests/webcross/musializer/android/app/.cxx/RelWith
 build cmake_object_order_depends_target_crossweb: phony || CMakeFiles/crossweb.dir
 
 build CMakeFiles/crossweb.dir/android_bridge.c.o: C_COMPILER__crossweb_RelWithDebInfo C$:/SAP/tests/webcross/musializer/android/app/src/main/c/android_bridge.c || cmake_object_order_depends_target_crossweb
-  DEFINES = -Dcrossweb_EXPORTS
+  DEFINES = -DCROSSWEB_TARGET_ANDROID=1 -Dcrossweb_EXPORTS
   DEP_FILE = CMakeFiles\crossweb.dir\android_bridge.c.o.d
   FLAGS = -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security -std=c99 -O2 -g -DNDEBUG -fPIC -std=gnu99
   INCLUDES = -IC:/SAP/tests/webcross/musializer/android/app/src/main/c/../../../../build
@@ -58,7 +58,7 @@ build CMakeFiles/crossweb.dir/android_bridge.c.o: C_COMPILER__crossweb_RelWithDe
   OBJECT_FILE_DIR = CMakeFiles\crossweb.dir
 
 build CMakeFiles/crossweb.dir/plug.c.o: C_COMPILER__crossweb_RelWithDebInfo C$:/SAP/tests/webcross/musializer/android/app/src/main/c/plug.c || cmake_object_order_depends_target_crossweb
-  DEFINES = -Dcrossweb_EXPORTS
+  DEFINES = -DCROSSWEB_TARGET_ANDROID=1 -Dcrossweb_EXPORTS
   DEP_FILE = CMakeFiles\crossweb.dir\plug.c.o.d
   FLAGS = -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security -std=c99 -O2 -g -DNDEBUG -fPIC -std=gnu99
   INCLUDES = -IC:/SAP/tests/webcross/musializer/android/app/src/main/c/../../../../build
@@ -66,7 +66,7 @@ build CMakeFiles/crossweb.dir/plug.c.o: C_COMPILER__crossweb_RelWithDebInfo C$:/
   OBJECT_FILE_DIR = CMakeFiles\crossweb.dir
 
 build CMakeFiles/crossweb.dir/ipc.c.o: C_COMPILER__crossweb_RelWithDebInfo C$:/SAP/tests/webcross/musializer/android/app/src/main/c/ipc.c || cmake_object_order_depends_target_crossweb
-  DEFINES = -Dcrossweb_EXPORTS
+  DEFINES = -DCROSSWEB_TARGET_ANDROID=1 -Dcrossweb_EXPORTS
   DEP_FILE = CMakeFiles\crossweb.dir\ipc.c.o.d
   FLAGS = -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security -std=c99 -O2 -g -DNDEBUG -fPIC -std=gnu99
   INCLUDES = -IC:/SAP/tests/webcross/musializer/android/app/src/main/c/../../../../build

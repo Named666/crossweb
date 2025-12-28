@@ -29,6 +29,19 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        // Handle JS dialogs
+        webView.webChromeClient = object : WebChromeClient() {
+            override fun onJsAlert(view: WebView?, url: String?, message: String?, result: JsResult?): Boolean {
+                android.app.AlertDialog.Builder(this@MainActivity)
+                    .setTitle("Alert")
+                    .setMessage(message)
+                    .setPositiveButton("OK") { _, _ -> result?.confirm() }
+                    .setCancelable(false)
+                    .show()
+                return true
+            }
+        }
+
         // Load native library
         System.loadLibrary("crossweb")
 
