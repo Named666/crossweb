@@ -20,5 +20,7 @@ nob.obj
 android/app/build/
 **/.gradle/
 **/.cxx/
-android/app/src/assets/
+android/app/src/main/assets/
 android/app/src/main/c/
+.gradle/
+*.lock
