@@ -20,5 +20,8 @@ nob.obj
 android/app/build/
 android/.gradle/
 android/app/.cxx/
-android/app/assets
-android/app/c
+android/app/src/assets
+android/app/src/main/c
+
+# Gradle folders
+.gradle/

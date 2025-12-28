@@ -4,12 +4,34 @@ import android.os.Bundle
 import android.webkit.*
 import androidx.appcompat.app.AppCompatActivity
 import androidx.webkit.WebViewAssetLoader
+import android.app.KeyguardManager
+import android.content.Context
+import android.content.Intent
+import android.provider.Settings
+import androidx.appcompat.app.AlertDialog
 
 class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+
+        // Check if device has secure lock screen
+        val keyguardManager = getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
+        if (!keyguardManager.isDeviceSecure) {
+            AlertDialog.Builder(this)
+                .setTitle("Secure Lock Screen Required")
+                .setMessage("This app requires a secure lock screen (PIN, pattern, or password) to protect your data. Please set one up.")
+                .setPositiveButton("Go to Settings") { _, _ ->
+                    startActivity(Intent(Settings.ACTION_SECURITY_SETTINGS))
+                }
+                .setNegativeButton("Cancel") { _, _ ->
+                    finish()
+                }
+                .setCancelable(false)
+                .show()
+            return
+        }
 
         val webView: WebView = findViewById(R.id.webview)
 
@@ -49,6 +71,9 @@ class MainActivity : AppCompatActivity() {
         val ipc = Ipc(webView)
         ipc.setActivity(this)
         webView.addJavascriptInterface(ipc, "__native__")
+
+        // Set keystore activity
+        com.example.crossweb.plugins.keystore.KeystoreManager.setActivity(this)
 
         // Load the local HTML file from assets folder via asset loader
         webView.loadUrl("https://appassets.androidplatform.net/index.html")

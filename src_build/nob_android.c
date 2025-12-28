@@ -30,8 +30,15 @@ bool collect_c_files(const char *dir, Nob_File_Paths *files, const char *base) {
         } else {
             size_t len = strlen(entry);
             if (len > 2 && strcmp(entry + len - 2, ".c") == 0) {
+                // Skip mobile.c and desktop.c in plugins/fs since they are included by lib.c
+                if ((strcmp(entry, "mobile.c") == 0 || strcmp(entry, "desktop.c") == 0) && strstr(dir, "plugins/fs") != NULL) continue;
                 char rel_path[1024];
-                sprintf(rel_path, "%s/%s", dir + strlen(base), entry);
+                size_t base_len = strlen(base);
+                if (strlen(dir) == base_len) {
+                    sprintf(rel_path, "%s", entry);
+                } else {
+                    sprintf(rel_path, "%s/%s", dir + base_len + 1, entry);
+                }
                 da_append(files, nob_temp_strdup(rel_path));
             }
         }
@@ -50,11 +57,8 @@ bool generate_cmake_lists(const char *path) {
     fprintf(f, "add_library(\n");
     fprintf(f, "\tcrossweb\n");
     fprintf(f, "\tSHARED\n");
-    fprintf(f, "\tandroid_bridge.c\n");
-    fprintf(f, "\tipc.c\n");
-    fprintf(f, "\tplug.c\n");
     Nob_File_Paths c_files = {0};
-    if (!collect_c_files("android/app/src/main/c", &c_files, "android/app/src/main/c/")) {
+    if (!collect_c_files("android/app/src/main/c", &c_files, "android/app/src/main/c")) {
         fclose(f);
         return false;
     }

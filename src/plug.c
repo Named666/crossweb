@@ -35,7 +35,7 @@ void plug_init(webview_t wv) {
     }
     // Register built-in plugins
 #ifdef CROSSWEB_PLUGIN_KEYSTORE
-    plug_register(&keystore_bio_plugin);
+    plug_register(&keystore_plugin);
 #endif
 
     // Initialize all registered plugins

@@ -3,6 +3,6 @@
 
 #include "../../../plug.h"
 
-extern Plugin keystore_bio_plugin;
+extern Plugin keystore_plugin;
 
 #endif // KEYSTORE_PLUGIN_H_

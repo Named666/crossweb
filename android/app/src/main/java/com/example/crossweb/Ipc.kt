@@ -9,6 +9,10 @@ class Ipc(val webView: WebView) {
         fun setActivity(act: android.app.Activity) {
             activity = act
         }
+
+        fun getContext(): android.content.Context {
+            return activity!!
+        }
     @JavascriptInterface
     fun postMessage(message: String?) {
         message?.let { m ->
@@ -27,10 +31,10 @@ class Ipc(val webView: WebView) {
 
     fun resolveInvoke(id: String, result: String) {
         Log.d("CrossWeb", "resolveInvoke called with result: $result")
-        // Send back to JS
-        val escaped = result.replace("'", "\\'").replace("\"", "\\\"")
+        // Send back to JS with id
+        val safeResult = result.replace("'", "\\'").replace("\n", "").replace("\r", "")
         webView.post {
-            webView.evaluateJavascript("window.__native__.onMessage('$escaped')", null)
+            webView.evaluateJavascript("window.__native__.onMessage('$id', JSON.parse('$safeResult'))", null)
         }
     }
 

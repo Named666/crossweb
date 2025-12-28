@@ -2,15 +2,19 @@
 #include <string.h>
 #include <stdio.h>
 #include <android/log.h>
+#include <stdbool.h>
 #include "plug.h"
 
 // Cache method id
 static jmethodID resolveInvokeMethodId;
 
 // For callback
-static JNIEnv *current_env;
-static jobject current_obj;
-static jstring current_jid;
+JNIEnv *current_env;
+jobject current_obj;
+jstring current_jid;
+
+// Keystore JNI globals
+// Keystore-specific JNI lookups moved to the keystore plugin
 
 void respond_callback(const char *response) {
     jstring jresult = (*current_env)->NewStringUTF(current_env, response);
@@ -56,6 +60,8 @@ JNIEXPORT void JNICALL Java_com_example_crossweb_Ipc_nativeInvoke(JNIEnv *env, j
     current_env = env;
     current_obj = obj;
     current_jid = jid;
+
+    // Plugin-specific JNI lookups are handled inside each plugin implementation.
 
     // Call plugin
     plug_invoke(cmd, payload, respond_callback);
@@ -111,12 +117,6 @@ JNIEXPORT void JNICALL Java_com_example_crossweb_CWebView_onEval(JNIEnv *env, jo
 // JNI functions for CWebChromeClient
 JNIEXPORT void JNICALL Java_com_example_crossweb_CWebChromeClient_handleReceivedTitle(JNIEnv *env, jobject obj, jobject jwebview, jstring jtitle) {
     // TODO: handle received title
-}
-
-bool android_keystore_bio_invoke(const char *cmd, const char *payload, RespondCallback respond) {
-    // Stub: keystore biometric is handled in Java layer via Ipc.invoke
-    respond("{\"ok\":false,\"msg\":\"Keystore handled in Java\"}");
-    return true;
 }
 
 JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {

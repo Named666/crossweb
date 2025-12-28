@@ -23,7 +23,7 @@ This document outlines the detailed implementation plan for the CrossWeb plugin 
   - `error.h`/`error.c`: Error handling
   - `desktop.c`: Desktop-specific implementations
   - `mobile.c`: Mobile-specific implementations
-  - `android/`: Android-specific code
+  - `android/`: Android-specific code (Kotlin/Java)
   - `ios/`: iOS-specific code
   - `guest-js/`: JavaScript API bindings
   - `permissions/`: Generated permission files
@@ -49,11 +49,11 @@ This document outlines the detailed implementation plan for the CrossWeb plugin 
 ### 2.2 JavaScript Bridge
 ```javascript
 // Invoke command
-const result = await window.__native__.invoke('fs.read', { path: '/file.txt' });
+const result = await window.__native__.invoke('plugin.command', { param1: 'value1' });
 
 // Listen for events
-window.__native__.listen('fs.change', (data) => {
-  console.log('File changed:', data);
+window.__native__.listen('plugin.event', (data) => {
+  console.log('Event received:', data);
 });
 ```
 
@@ -134,18 +134,20 @@ src/
 ├── plug.c/h          # Plugin system core
 ├── ipc.c/h           # IPC implementation
 └── plugins/
-    └── fs/
-        ├── lib.c
-        ├── plugin.h
-        ├── commands.c
-        ├── models.h
-        ├── error.h/c
-        ├── desktop.c
-        ├── mobile.c
+    └── <plugin-name>/
+        ├── src/
+        │   ├── lib.c
+        │   ├── plugin.h
+        │   ├── commands.c
+        │   ├── models.h
+        │   ├── error.h/c
+        │   ├── desktop.c
+        │   └── mobile.c
         ├── android/
         ├── ios/
         ├── guest-js/
         └── permissions/
+
 ```
 
 This specification provides a roadmap for implementing a robust, secure, and extensible plugin system for CrossWeb.

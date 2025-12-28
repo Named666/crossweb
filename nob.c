@@ -7,6 +7,91 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <sys/stat.h>
+
+bool is_dir(const char *path) {
+    struct stat st;
+    if (stat(path, &st) == 0) {
+        return S_ISDIR(st.st_mode);
+    }
+    return false;
+}
+
+bool is_plugin_enabled(const char *plugin_name) {
+    String_Builder content = {0};
+    if (!read_entire_file("build/config.h", &content)) return true; // if not found, assume enabled
+    char macro[256];
+    sprintf(macro, "#define CROSSWEB_PLUGIN_%s 1", plugin_name);
+    for (size_t j = strlen("#define CROSSWEB_PLUGIN_"); j < strlen(macro); ++j) {
+        macro[j] = toupper(macro[j]);
+    }
+    bool enabled = strstr(content.items, macro) != NULL;
+    da_free(content);
+    return enabled;
+}
+
+bool collect_c_files(const char *dir, Nob_File_Paths *files, const char *base) {
+    Nob_File_Paths entries = {0};
+    if (!read_entire_dir(dir, &entries)) return false;
+    for (size_t i = 0; i < entries.count; ++i) {
+        const char *entry = entries.items[i];
+        if (strcmp(entry, ".") == 0 || strcmp(entry, "..") == 0) continue;
+        char path[1024];
+        sprintf(path, "%s/%s", dir, entry);
+        if (is_dir(path)) {
+            if (!collect_c_files(path, files, base)) return false;
+        } else {
+            size_t len = strlen(entry);
+            if (len > 2 && strcmp(entry + len - 2, ".c") == 0) {
+                // Skip mobile.c and desktop.c in plugins/fs since they are included by lib.c
+                if ((strcmp(entry, "mobile.c") == 0 || strcmp(entry, "desktop.c") == 0) && strstr(dir, "plugins/fs") != NULL) continue;
+                char rel_path[1024];
+                size_t base_len = strlen(base);
+                if (strlen(dir) == base_len) {
+                    sprintf(rel_path, "%s", entry);
+                } else {
+                    sprintf(rel_path, "%s/%s", dir + base_len + 1, entry);
+                }
+                da_append(files, nob_temp_strdup(rel_path));
+            }
+        }
+    }
+    da_free(entries);
+    return true;
+}
+
+bool generate_cmake_lists(const char *path) {
+    FILE *f = fopen(path, "w");
+    if (!f) return false;
+    fprintf(f, "cmake_minimum_required(VERSION 3.4.1)\n");
+    fprintf(f, "project(crossweb C)\n\n");
+    fprintf(f, "include_directories(${CMAKE_CURRENT_SOURCE_DIR})\n\n");
+    fprintf(f, "# Add your native source files here\n");
+    fprintf(f, "add_library(\n");
+    fprintf(f, "\tcrossweb\n");
+    fprintf(f, "\tSHARED\n");
+    Nob_File_Paths c_files = {0};
+    if (!collect_c_files("android/app/src/main/c", &c_files, "android/app/src/main/c")) {
+        fclose(f);
+        return false;
+    }
+    for (size_t i = 0; i < c_files.count; ++i) {
+        fprintf(f, "\t%s\n", c_files.items[i]);
+    }
+    da_free(c_files);
+    fprintf(f, ")\n\n");
+    fprintf(f, "# Link against Android log library\n");
+    fprintf(f, "find_library(\n");
+    fprintf(f, "\tlog-lib\n");
+    fprintf(f, "\tlog\n");
+    fprintf(f, ")\n");
+    fprintf(f, "target_link_libraries(\n");
+    fprintf(f, "\tcrossweb\n");
+    fprintf(f, "\t${log-lib}\n");
+    fprintf(f, ")\n");
+    fclose(f);
+    return true;
+}
 
 bool replace_in_file(const char *path, const char *old_str, const char *new_str) {
     String_Builder content = {0};
@@ -222,6 +307,8 @@ int main(int argc, char **argv)
                 if (!mkdir_if_not_exists("android/app/src/main/c/plugins/keystore/src")) return 1;
                 if (!copy_file("src/plugins/keystore/src/plugin.c", "android/app/src/main/c/plugins/keystore/src/plugin.c")) return 1;
                 if (!copy_file("src/plugins/keystore/src/plugin.h", "android/app/src/main/c/plugins/keystore/src/plugin.h")) return 1;
+                // Generate CMakeLists.txt
+                if (!generate_cmake_lists("android/app/src/main/c/CMakeLists.txt")) return 1;
                 // Build release
                 cmd = (Cmd){0};
                 cmd_append(&cmd, "cmd");
