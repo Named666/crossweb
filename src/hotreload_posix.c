@@ -1,8 +1,6 @@
 #include <stdio.h>
 #include <dlfcn.h>
 
-#include <raylib.h>
-
 #include "hotreload.h"
 
 #if defined(MUSIALIZER_TARGET_MACOS)

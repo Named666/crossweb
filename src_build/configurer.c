@@ -1,54 +1,4 @@
-#define RAYLIB_VERSION "5.5"
 #define CONFIG_PATH "./build/config.h"
-#define RAYLIB_SRC_FOLDER "./thirdparty/raylib-" RAYLIB_VERSION "/src/"
-
-typedef struct {
-    const char *macro;
-    bool enabled_by_default;
-} Target_Flag;
-
-static Target_Flag target_flags[] = {
-    {
-        .macro = "MUSIALIZER_TARGET_LINUX",
-        #if defined(linux) || defined(__linux) || defined(__linux__)
-            .enabled_by_default = true,
-        #else
-            .enabled_by_default = false,
-        #endif
-    },
-    {
-        .macro = "MUSIALIZER_TARGET_WIN64_MINGW",
-        #if (defined(WIN32) || defined(_WIN32)) && defined(__MINGW32__)
-            .enabled_by_default = true,
-        #else
-            .enabled_by_default = false,
-        #endif
-    },
-    {
-        .macro = "MUSIALIZER_TARGET_WIN64_MSVC",
-        #if (defined(WIN32) || defined(_WIN32)) && defined(_MSC_VER)
-            .enabled_by_default = true,
-        #else
-            .enabled_by_default = false,
-        #endif
-    },
-    {
-        .macro = "MUSIALIZER_TARGET_MACOS",
-        #if defined(__APPLE__) || defined(__MACH__)
-            .enabled_by_default = true,
-        #else
-            .enabled_by_default = false,
-        #endif
-    },
-    {
-        .macro = "MUSIALIZER_TARGET_OPENBSD",
-        #if defined(__OpenBSD__)
-            .enabled_by_default = true,
-        #else
-            .enabled_by_default = false,
-        #endif
-    },
-};
 
 typedef struct {
     const char *name;
@@ -59,26 +9,67 @@ typedef struct {
 
 static Feature_Flag feature_flags[] = {
     {
-        .macro = "MUSIALIZER_HOTRELOAD",
+        .macro = "CROSSWEB_HOTRELOAD",
         .name = "hotreload",
         .description = "Moves everything in src/plug.c to a separate \"DLL\" so it can be hotreloaded.",
+        .enabled_by_default = true,
     },
     {
-        .macro = "MUSIALIZER_UNBUNDLE",
+        .macro = "CROSSWEB_UNBUNDLE",
         .name = "unbundle",
         .description = "Don't bundle resources/ folder with the executable and load the resources directly from the folder.",
-    },
-    {
-        .macro = "MUSIALIZER_MICROPHONE",
-        .name = "microphone",
-        .description = "Unfinished feature that enables capturing sound from the mic."
+        .enabled_by_default = false,
     },
 };
 
-// Removed feature flags
-#ifdef MUSIALIZER_ACT_ON_PRESS
-#error "MUSIALIZER_ACT_ON_PRESS no longer exists. Please remove it from your build/config.h"
-#endif // MUSIALIZER_ACT_ON_PRESS
+typedef struct {
+    const char *name;
+    const char *macro;
+    bool enabled_by_default;
+} Target_Flag;
+
+static Target_Flag target_flags[] = {
+    {
+        .macro = "CROSSWEB_TARGET_WIN64_GCC",
+        .name = "win64-gcc",
+        .enabled_by_default = true,
+    },
+    {
+        .macro = "CROSSWEB_TARGET_WIN64_MSVC",
+        .name = "win64-msvc",
+        .enabled_by_default = false,
+    },
+    {
+        .macro = "CROSSWEB_TARGET_WIN64_MINGW",
+        .name = "win64-mingw",
+        .enabled_by_default = false,
+    },
+    {
+        .macro = "CROSSWEB_TARGET_LINUX",
+        .name = "linux",
+        .enabled_by_default = false,
+    },
+    {
+        .macro = "CROSSWEB_TARGET_MACOS",
+        .name = "macos",
+        .enabled_by_default = false,
+    },
+    {
+        .macro = "CROSSWEB_TARGET_OPENBSD",
+        .name = "openbsd",
+        .enabled_by_default = false,
+    },
+    {
+        .macro = "CROSSWEB_TARGET_ANDROID",
+        .name = "android",
+        .enabled_by_default = false,
+    },
+    {
+        .macro = "CROSSWEB_TARGET_IOS",
+        .name = "ios",
+        .enabled_by_default = false,
+    },
+};
 
 #define genf(out, ...) \
     do { \
@@ -95,55 +86,55 @@ bool generate_default_config(const char *file_path)
         return false;
     }
 
-    // TODO: generate_default_config() should also log what platform it picked
-    fprintf(f, "//// Build target. Pick only one!\n");
-    for (size_t i = 0; i < NOB_ARRAY_LEN(target_flags); ++i) {
-        if (target_flags[i].enabled_by_default) {
-            fprintf(f, "#define %s\n", target_flags[i].macro);
-        } else {
-            fprintf(f, "// #define %s\n", target_flags[i].macro);
-        }
+    fprintf(f, "//// Feature flags\n");
+    for (size_t i = 0; i < NOB_ARRAY_LEN(feature_flags); ++i) {
+        Feature_Flag flag = feature_flags[i];
+        genf(f, "#define %s %d\n", flag.macro, flag.enabled_by_default ? 1 : 0);
     }
 
-    fprintf(f, "\n");
-
-    for (size_t i = 0; i < NOB_ARRAY_LEN(feature_flags); ++i) {
-        fprintf(f, "//// %s\n", feature_flags[i].description);
-        if (feature_flags[i].enabled_by_default) {
-            nob_log(INFO, "%s: ENABLED", feature_flags[i].name);
-            fprintf(f, "#define %s\n", feature_flags[i].macro);
+    fprintf(f, "\n//// Target\n");
+    for (size_t i = 0; i < NOB_ARRAY_LEN(target_flags); ++i) {
+        Target_Flag flag = target_flags[i];
+        if (flag.enabled_by_default) {
+            genf(f, "#define %s 1\n", flag.macro);
         } else {
-            nob_log(INFO, "%s: DISABLED", feature_flags[i].name);
-            fprintf(f, "// #define %s\n", feature_flags[i].macro);
+            genf(f, "// #define %s 1\n", flag.macro);
         }
-        fprintf(f, "\n");
-
     }
 
     fclose(f);
     return true;
 }
 
-bool generate_config_logger(const char *config_logger_path)
+bool generate_config_logger(const char *file_path)
 {
-    nob_log(NOB_INFO, "Generating %s", config_logger_path);
-    FILE *f = fopen(config_logger_path, "wb");
+    nob_log(NOB_INFO, "Generating %s", file_path);
+    FILE *f = fopen(file_path, "wb");
     if (f == NULL) {
-        nob_log(NOB_ERROR, "Could not generate %s: %s", config_logger_path, strerror(errno));
+        nob_log(NOB_ERROR, "Could not generate %s: %s", file_path, strerror(errno));
         return false;
     }
 
-    genf(f, "void log_config(Nob_Log_Level level)");
-    genf(f, "{");
-    genf(f, "    nob_log(level, \"Target: %%s\", MUSIALIZER_TARGET_NAME);");
+    genf(f, "#include <stdio.h>\n");
+    genf(f, "#include \"../build/config.h\"\n");
+    genf(f, "\n");
+    genf(f, "int main(int argc, char **argv) {\n");
+    genf(f, "    (void)argc; (void)argv;\n");
+    genf(f, "    printf(\"Crossweb Build Config:\\n\");\n");
     for (size_t i = 0; i < NOB_ARRAY_LEN(feature_flags); ++i) {
-        genf(f, "    #ifdef %s", feature_flags[i].macro);
-        genf(f, "        nob_log(level, \"%s: ENABLED\");", feature_flags[i].name);
-        genf(f, "    #else");
-        genf(f, "        nob_log(level, \"%s: DISABLED\");", feature_flags[i].name);
-        genf(f, "    #endif");
+        Feature_Flag flag = feature_flags[i];
+        genf(f, "    printf(\"  %s: %%s\\n\", %s ? \"enabled\" : \"disabled\");\n", flag.name, flag.macro);
     }
-    genf(f, "}");
+    for (size_t i = 0; i < NOB_ARRAY_LEN(target_flags); ++i) {
+        Target_Flag flag = target_flags[i];
+        genf(f, "#ifdef %s\n", flag.macro);
+        genf(f, "    printf(\"  %s: enabled\\n\");\n", flag.name);
+        genf(f, "#else\n");
+        genf(f, "    printf(\"  %s: disabled\\n\");\n", flag.name);
+        genf(f, "#endif\n");
+    }
+    genf(f, "    return 0;\n");
+    genf(f, "}\n");
 
     fclose(f);
     return true;

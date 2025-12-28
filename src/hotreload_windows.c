@@ -4,7 +4,6 @@
 #define NOUSER
 #include <windows.h>
 
-#include <raylib.h>
 #include "hotreload.h"
 
 static const char *libplug_file_name = "libplug.dll";
@@ -20,19 +19,24 @@ bool reload_libplug(void)
 
     libplug = LoadLibrary(libplug_file_name);
     if (libplug == NULL) {
-        TraceLog(LOG_ERROR, "HOTRELOAD: could not load %s: %s", libplug_file_name, GetLastError());
-        return false;
+        printf("HOTRELOAD: could not load %s: %lu\n", libplug_file_name, GetLastError());
+        return 0;
     }
 
     #define PLUG(name, ...) \
         name = (void*)GetProcAddress(libplug, #name); \
         if (name == NULL) { \
-            TraceLog(LOG_ERROR, "HOTRELOAD: could not find %s symbol in %s: %s", \
+            printf("HOTRELOAD: could not find %s symbol in %s: %lu\n", \
                      #name, libplug_file_name, GetLastError()); \
-            return false; \
+            return 0; \
         }
     LIST_OF_PLUGS
     #undef PLUG
 
-    return true;
+    return 1;
+}
+
+bool reload_libplug_changed(void) {
+    // Stub: always return false for now
+    return 0;
 }

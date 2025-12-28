@@ -1,4 +1,4 @@
-# Musializer
+# CrossWeb
 
 <p align=center>
   <img src="./resources/logo/logo-256.png">
@@ -7,90 +7,96 @@
 > [!WARNING]
 > This software is unfinished. Keep your expectations low.
 
-The project aims to make a tool for creating beautiful music visualizations and rendering high quality videos of them.
+CrossWeb is a cross-platform webview framework inspired by Tauri 2.0, built entirely in C. It provides a native webview container with IPC communication between JavaScript and C, hot-reloading for development, and a plugin system for extensibility.
 
 *Please, read [CONTRIBUTING.md](CONTRIBUTING.md) before making a PR.*
 
-## Demo
+## Features
 
-*Music by [@nu11](https://soundcloud.com/nu11_ft) from [https://soundcloud.com/nu11_ft/nu11-wip-works-2016-2022](https://soundcloud.com/nu11_ft/nu11-wip-works-2016-2022) at 20:38*
+- Cross-platform webview (WebView2 on Windows, WKWebView on macOS, WebKitGTK on Linux)
+- IPC communication between web app and native C code
+- Hot-reloading for development
+- Plugin system with ABI-stable C interfaces
+- No JavaScript build tools required in the runtime
+- Deterministic builds with nob.h
 
-https://github.com/tsoding/musializer/assets/165283/8b9f9653-9b3d-4c04-9569-338fa19af071
+## Supported Platforms
 
-## Supported Audio Formats
-
-- wav
-- ogg
-- mp3
-- qoa
-- xm
-- mod
-- flac
+- Windows (MSVC and MinGW GCC)
+- Linux (planned)
+- macOS (planned)
+- Mobile (iOS/Android stubs)
 
 ## Download Binaries
 
-- Windows: [musializer-alpha2-win64.zip](https://github.com/tsoding/musializer/releases/download/alpha2/musializer-alpha2-win64.zip)
-- Linux: *in progress*
+- Windows MSVC: [crossweb-alpha1-win64-msvc.zip](https://github.com/your-repo/crossweb/releases/download/alpha1/crossweb-alpha1-win64-msvc.zip)
+- Windows MinGW: [crossweb-alpha1-win64-mingw.zip](https://github.com/your-repo/crossweb/releases/download/alpha1/crossweb-alpha1-win64-mingw.zip)
 
 ## Build from Source
 
-External Dependencies:
-- [ffmpeg](https://ffmpeg.org/) executable available in `PATH` environment variable. It is called as a child process during the rendering of the videos. So if you don't plan to render any videos it's completely **optional**.
-
-We are using Custom Build System written entirely in C called `nob`. [nob.c](./nob.c) is the program that builds Musializer. For more info on this Build System see the [nob.h repo](https://github.com/tsoding/nob.h).
+We are using Custom Build System written entirely in C called `nob`. [nob.c](./nob.c) is the program that builds CrossWeb. For more info on this Build System see the [nob.h repo](https://github.com/tsoding/nob.h).
 
 Before using `nob` you need to bootstrap it. Just compile it with the available C compiler. On Linux it's usually `$ cc -o nob nob.c` on Windows with MSVC from within `vcvarsall.bat` it's `$ cl.exe nob.c`. You only need to boostrap it once. After the bootstrap you can just keep running the same executable over and over again. It even tries to rebuild itself if you modify [nob.c](./nob.c) (which may fail sometimes, so in that case be ready to reboostrap it).
 
 I really recommend to read [nob.c](./nob.c) and [nob.h](https://github.com/tsoding/nob.h) to get an idea of how it all actually works. The Build System is a work in progress, so if something breaks be ready to dive into it.
 
-### Linux and OpenBSD
-
-```console
-$ cc -o nob nob.c # ONLY ONCE!!!
-$ ./nob
-$ ./build/musializer
-```
-
-If the build fails because of missing header files, you may need to install the X11 dev packages.
-
-On Debian, Ubuntu, etc, do this:
-
-```console
-$ sudo apt install libx11-dev libxcursor-dev libxrandr-dev libxinerama-dev libxi-dev
-```
-
-On other distro's, use the appropriate package manager.
-
 ### Windows MSVC
 
-From within `vcvarsall.bat` do
-
 ```console
-> cl.exe nob.c # ONLY ONCE!!!
-> nob.exe
-> build\musializer.exe
+$ cl.exe nob.c  # ONLY ONCE!!!
+$ .\nob
 ```
 
-### Cross Compilation from Linux to Windows using MinGW-w64
-
-Install [MinGW-w64](https://www.mingw-w64.org/) from your distro repository.
-
-Edit `./build/config.h` and set `MUSIALIZER_TARGET_WIN64_MINGW` instead of `MUSIALIZER_TARGET_LINUX`.
+### Windows MinGW
 
 ```console
+$ gcc nob.c -o nob  # ONLY ONCE!!!
 $ ./nob
-$ wine ./build/musializer.exe
 ```
+$ ./build/crossweb
+```
+
+## Usage
+
+Run the built executable:
+
+```console
+$ ./build/crossweb [url]
+```
+
+If no URL is provided, it loads the local web app from `./web/index.html`.
 
 ## Hot Reloading
 
-Edit `./build/config.h` and enable `MUSIALIZER_HOTRELOAD`.
+Edit `./src_build/configurer.c` and enable `CROSSWEB_HOTRELOAD`.
 
 ```console
 $ ./nob
-$ ./build/musializer
+$ ./build/crossweb
 ```
+
+This allows you to modify the plugin code in `src/plug.c` and see changes without restarting the application.
+
+## Architecture
+
+CrossWeb consists of:
+
+- **Webview Layer**: Cross-platform webview using webview-c library
+- **IPC System**: JSON/MessagePack communication between web and native
+- **Plugin System**: ABI-stable C plugins for extensibility
+- **Hot Reload**: Development-time plugin reloading
+- **Build System**: nob.h-based deterministic builds
+
+## Developing Web Apps
+
+Place your web application files in the `./web/` directory. The main entry point should be `./web/index.html`.
+
+For IPC communication, use the JavaScript functions defined in `index.html` as examples. Messages are sent to the native side and responses are received asynchronously.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines.
 
 Keep the app running. Rebuild with `./nob`. Hot reload by focusing on the window of the app and pressing <kbd>h</kbd>.
 
-The way it works is by putting the majority of the logic of the application into a `libplug` dynamic library and just reloading it when requested. The [rpath](https://en.wikipedia.org/wiki/Rpath) (aka hard-coded run-time search path) for that library is set to `.` and `./build/`. See [src_build/nob_linux.c](src_build/nob_linux.c) for more information on how everything is configured.
+The way it works is by putting the majority of the logic of the application into a `libplug` dynamic library and just reloading it when requested. The [rpath](https://en.wikipedia.org/wiki/Rpath) (aka hard-coded run-time search path) for that library is set to `.` and `./build/`. See [src_build/nob_win64_msvc.c](src_build/nob_win64_msvc.c) for more information on how everything is configured.
