@@ -1,25 +1,70 @@
 #include <jni.h>
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <android/log.h>
 #include <stdbool.h>
+#include <pthread.h>
 #include "plug.h"
 
-// Cache method id
+// Cache method ids
 static jmethodID resolveInvokeMethodId;
+jmethodID emitMethodId;
 
 // For callback
 JNIEnv *current_env;
 jobject current_obj;
 jstring current_jid;
 
+// Global for emit
+JNIEnv *global_env = NULL;
+jobject global_obj = NULL;
+
 // Keystore JNI globals
 // Keystore-specific JNI lookups moved to the keystore plugin
+
+struct InvokeData {
+    char *id;
+    char *cmd;
+    char *payload;
+    JNIEnv *env;
+    jobject obj;
+    jstring jid;
+};
 
 void respond_callback(const char *response) {
     jstring jresult = (*current_env)->NewStringUTF(current_env, response);
     (*current_env)->CallVoidMethod(current_env, current_obj, resolveInvokeMethodId, current_jid, jresult);
     (*current_env)->DeleteLocalRef(current_env, jresult);
+}
+
+void *async_invoke(void *arg) {
+    struct InvokeData *data = (struct InvokeData *)arg;
+
+    // Attach to JVM
+    JavaVM *jvm;
+    (*data->env)->GetJavaVM(data->env, &jvm);
+    JNIEnv *thread_env;
+    (*jvm)->AttachCurrentThread(jvm, &thread_env, NULL);
+
+    // Set current for callback
+    current_env = thread_env;
+    current_obj = data->obj;
+    current_jid = data->jid;
+
+    // Call plugin
+    plug_invoke(data->cmd, data->payload, respond_callback);
+
+    // Detach
+    (*jvm)->DetachCurrentThread(jvm);
+
+    // Free
+    free(data->id);
+    free(data->cmd);
+    free(data->payload);
+    free(data);
+
+    return NULL;
 }
 
 JNIEXPORT void JNICALL Java_com_example_crossweb_Ipc_ipc(JNIEnv *env, jobject obj, jstring jurl, jstring jmessage) {
@@ -38,7 +83,7 @@ JNIEXPORT void JNICALL Java_com_example_crossweb_Ipc_ipc(JNIEnv *env, jobject ob
 }
 
 JNIEXPORT void JNICALL Java_com_example_crossweb_Ipc_nativeInvoke(JNIEnv *env, jobject obj, jstring jid, jstring jcmd, jstring jpayload) {
-    // Cache method id if not done
+    // Cache method ids if not done
     if (resolveInvokeMethodId == NULL) {
         jclass cls = (*env)->FindClass(env, "com/example/crossweb/Ipc");
         if (cls == NULL) {
@@ -47,31 +92,40 @@ JNIEXPORT void JNICALL Java_com_example_crossweb_Ipc_nativeInvoke(JNIEnv *env, j
         }
         resolveInvokeMethodId = (*env)->GetMethodID(env, cls, "resolveInvoke", "(Ljava/lang/String;Ljava/lang/String;)V");
         if (resolveInvokeMethodId == NULL) {
-            __android_log_print(ANDROID_LOG_ERROR, "CrossWeb", "Failed to find method");
+            __android_log_print(ANDROID_LOG_ERROR, "CrossWeb", "Failed to find resolveInvoke method");
             return;
         }
+        emitMethodId = (*env)->GetMethodID(env, cls, "emit", "(Ljava/lang/String;Ljava/lang/String;)V");
+        if (emitMethodId == NULL) {
+            __android_log_print(ANDROID_LOG_ERROR, "CrossWeb", "Failed to find emit method");
+            return;
+        }
+    }
+
+    // Set global for emit
+    if (global_env == NULL) {
+        global_env = env;
+        global_obj = (*env)->NewGlobalRef(env, obj);
     }
 
     const char *id = (*env)->GetStringUTFChars(env, jid, 0);
     const char *cmd = (*env)->GetStringUTFChars(env, jcmd, 0);
     const char *payload = (*env)->GetStringUTFChars(env, jpayload, 0);
 
-    // Set globals for callback
-    current_env = env;
-    current_obj = obj;
-    current_jid = jid;
+    // Create async invoke
+    struct InvokeData *data = malloc(sizeof(struct InvokeData));
+    data->id = strdup(id);
+    data->cmd = strdup(cmd);
+    data->payload = strdup(payload);
+    data->env = env;
+    data->obj = obj;
+    data->jid = jid;
 
-    // Plugin-specific JNI lookups are handled inside each plugin implementation.
+    pthread_t thread;
+    pthread_create(&thread, NULL, async_invoke, data);
+    pthread_detach(thread);
 
-    // Call plugin
-    plug_invoke(cmd, payload, respond_callback);
-
-    // Clear globals
-    current_env = NULL;
-    current_obj = NULL;
-    current_jid = NULL;
-
-    // Release strings
+    // Release strings (don't release jid, as it's used in thread)
     (*env)->ReleaseStringUTFChars(env, jid, id);
     (*env)->ReleaseStringUTFChars(env, jcmd, cmd);
     (*env)->ReleaseStringUTFChars(env, jpayload, payload);

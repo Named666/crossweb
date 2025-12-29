@@ -2,6 +2,35 @@
 
 #include <ctype.h>
 
+const char *get_package_name_android(void) {
+    static char package_name[256];
+    String_Builder manifest = {0};
+    if (!read_entire_file("android/app/src/main/AndroidManifest.xml", &manifest)) {
+        return NULL;
+    }
+    const char *package_attr = "package=\"";
+    char *pos = strstr(manifest.items, package_attr);
+    if (!pos) {
+        da_free(manifest);
+        return NULL;
+    }
+    pos += strlen(package_attr);
+    char *end = strchr(pos, '"');
+    if (!end) {
+        da_free(manifest);
+        return NULL;
+    }
+    size_t len = end - pos;
+    if (len >= sizeof(package_name)) {
+        da_free(manifest);
+        return NULL;
+    }
+    memcpy(package_name, pos, len);
+    package_name[len] = '\0';
+    da_free(manifest);
+    return package_name;
+}
+
 bool is_plugin_enabled(const char *plugin_name) {
     String_Builder content = {0};
     if (!read_entire_file("build/config.h", &content)) return true; // if not found, assume enabled
@@ -81,6 +110,16 @@ bool generate_cmake_lists(const char *path) {
 }
 
 bool copy_plugins_for_android(void) {
+    const char *package_name = get_package_name_android();
+    if (!package_name) package_name = "com.example.crossweb"; // fallback
+    
+    // Convert package to path
+    char package_path[1024];
+    strcpy(package_path, package_name);
+    for (char *p = package_path; *p; ++p) {
+        if (*p == '.') *p = '/';
+    }
+    
     if (!mkdir_if_not_exists("android/app/src/main/c/plugins")) return false;
     Nob_File_Paths plugins = {0};
     if (!nob_read_entire_dir("src/plugins", &plugins)) return false;
@@ -129,7 +168,9 @@ bool copy_plugins_for_android(void) {
             char android_src_star[1024];
             sprintf(android_src_star, "%s\\*", android_src);
             nob_cmd_append(&copy_cmd, android_src_star);
-            nob_cmd_append(&copy_cmd, "android\\app\\src\\main\\java\\com\\example\\crossweb");
+            char dest_dir[1024];
+            sprintf(dest_dir, "android\\app\\src\\main\\java\\%s", package_path);
+            nob_cmd_append(&copy_cmd, dest_dir);
             if (!nob_cmd_run_sync(copy_cmd)) {
                 nob_cmd_free(copy_cmd);
                 // Continue, maybe no files
@@ -183,6 +224,56 @@ bool copy_plugins_for_android(void) {
     return true;
 }
 
+bool generate_proguard_rules(const char *package_name) {
+    FILE *f = fopen("android/app/proguard-rules.pro", "w");
+    if (!f) return false;
+
+    // Write base rules
+    fprintf(f, "# Add project specific ProGuard rules here.\n");
+    fprintf(f, "# You can control the set of applied configuration files using the\n");
+    fprintf(f, "# proguardFiles setting in build.gradle.kts.\n");
+    fprintf(f, "#\n");
+    fprintf(f, "# For more details, see\n");
+    fprintf(f, "#   http://developer.android.com/guide/developing/tools/proguard.html\n");
+    fprintf(f, "#\n");
+    fprintf(f, "# If your project uses WebView with JS, uncomment the following\n");
+    fprintf(f, "# and specify the fully qualified class name to the JavaScript interface\n");
+    fprintf(f, "# class:\n");
+    fprintf(f, "-keepclassmembers class %s.Ipc {\n", package_name);
+    fprintf(f, "    public *;\n");
+    fprintf(f, "}\n");
+    fprintf(f, "#\n");
+    fprintf(f, "# Keep native methods\n");
+    fprintf(f, "-keepclasseswithmembernames class %s.Ipc {\n", package_name);
+    fprintf(f, "    native <methods>;\n");
+    fprintf(f, "}\n");
+    fprintf(f, "#\n");
+
+    // Generate plugin rules
+    Nob_File_Paths plugins = {0};
+    if (!nob_read_entire_dir("src/plugins", &plugins)) {
+        fclose(f);
+        return false;
+    }
+    for (size_t i = 0; i < plugins.count; ++i) {
+        const char *plugin_name = plugins.items[i];
+        if (strcmp(plugin_name, ".") == 0 || strcmp(plugin_name, "..") == 0) continue;
+        if (!is_plugin_enabled(plugin_name)) continue;
+        char android_path[1024];
+        sprintf(android_path, "src/plugins/%s/android", plugin_name);
+        if (file_exists(android_path) == 1) {  // if android dir exists
+            fprintf(f, "# Keep %s plugin classes since they are accessed via JNI\n", plugin_name);
+            fprintf(f, "-keep class %s.plugins.%s.** {\n", package_name, plugin_name);
+            fprintf(f, "    *;\n");
+            fprintf(f, "}\n");
+            fprintf(f, "#\n");
+        }
+    }
+    da_free(plugins);
+    fclose(f);
+    return true;
+}
+
 bool build_crossweb(void)
 {
     // Build web assets
@@ -209,6 +300,11 @@ bool build_crossweb(void)
 
     // Copy plugin files
     if (!copy_plugins_for_android()) return false;
+
+    // Generate ProGuard rules for plugins
+    const char *package_name = get_package_name_android();
+    if (!package_name) package_name = "com.example.crossweb"; // fallback
+    if (!generate_proguard_rules(package_name)) return false;
 
     if (!generate_cmake_lists("android/app/src/main/c/CMakeLists.txt")) return false;
     if (!mkdir_if_not_exists("android/app/src/main/assets")) return false;
@@ -262,6 +358,11 @@ bool build_dist(void)
 
     // Copy plugin files
     if (!copy_plugins_for_android()) return false;
+
+    // Generate ProGuard rules for plugins
+    const char *package_name = get_package_name_android();
+    if (!package_name) package_name = "com.example.crossweb"; // fallback
+    if (!generate_proguard_rules(package_name)) return false;
 
     if (!generate_cmake_lists("android/app/src/main/c/CMakeLists.txt")) return false;
     if (!mkdir_if_not_exists("android/app/src/main/assets")) return false;

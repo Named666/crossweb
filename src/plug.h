@@ -32,7 +32,8 @@ typedef struct Plugin {
     PLUG(plug_free_resource, void, void*) \
     PLUG(plug_update, void, webview_t) \
     PLUG(plug_cleanup, void, webview_t) \
-    PLUG(plug_invoke, void, const char*, const char*, RespondCallback)
+    PLUG(plug_invoke, void, const char*, const char*, RespondCallback) \
+    PLUG(plug_emit, void, const char*, const char*)
 
 #define PLUG(name, ret, ...) typedef ret (name##_t)(__VA_ARGS__);
 LIST_OF_PLUGS
@@ -41,5 +42,12 @@ LIST_OF_PLUGS
 #define PLUG(name, ret, ...) extern ret name(__VA_ARGS__);
 LIST_OF_PLUGS
 #undef PLUG
+
+#ifdef ANDROID
+#include <jni.h>
+extern JNIEnv *global_env;
+extern jobject global_obj;
+extern jmethodID emitMethodId;
+#endif
 
 #endif // PLUG_H_

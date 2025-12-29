@@ -9,6 +9,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef ANDROID
+#include <jni.h>
+#endif
+
 // Plugin system
 #define MAX_PLUGINS 100
 static Plugin *registered_plugins[MAX_PLUGINS];
@@ -70,6 +74,23 @@ void plug_invoke(const char *cmd, const char *payload, RespondCallback respond) 
         }
     }
     if (respond) respond("{\"error\":\"unknown plugin\"}");
+}
+
+void plug_emit(const char *event, const char *data) {
+#ifdef ANDROID
+    // Emit event to JS via JNI
+    // Assuming global_env and global_obj are set
+    extern JNIEnv *global_env;
+    extern jobject global_obj;
+    extern jmethodID emitMethodId;
+    if (global_env && global_obj && emitMethodId) {
+        jstring jevent = (*global_env)->NewStringUTF(global_env, event);
+        jstring jdata = (*global_env)->NewStringUTF(global_env, data);
+        (*global_env)->CallVoidMethod(global_env, global_obj, emitMethodId, jevent, jdata);
+        (*global_env)->DeleteLocalRef(global_env, jevent);
+        (*global_env)->DeleteLocalRef(global_env, jdata);
+    }
+#endif
 }
 
 void plug_update(webview_t wv) {

@@ -1,4 +1,4 @@
-package com.example.crossweb
+package {{PACKAGE_NAME}}
 
 import android.os.Bundle
 import android.webkit.*
@@ -57,6 +57,15 @@ class MainActivity : AppCompatActivity() {
             override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
                 return assetLoader.shouldInterceptRequest(request.url)
             }
+
+            override fun onPageFinished(view: WebView?, url: String?) {
+                view?.evaluateJavascript("""
+                    var meta = document.createElement('meta');
+                    meta.httpEquiv = 'Content-Security-Policy';
+                    meta.content = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';";
+                    document.head.appendChild(meta);
+                """, null)
+            }
         }
 
         // Handle JS dialogs
@@ -80,8 +89,12 @@ class MainActivity : AppCompatActivity() {
         ipc.setActivity(this)
         webView.addJavascriptInterface(ipc, "__native__")
 
-        // Set keystore activity
-        com.example.crossweb.plugins.keystore.KeystoreManager.setActivity(this)
+        // Inject JS bridge for events
+        webView.evaluateJavascript("""
+            window.__native__.listen = function(callback) {
+                window.__native__.onEvent = callback;
+            };
+        """, null)
 
         // Load the local HTML file from assets folder via asset loader
         webView.loadUrl("https://appassets.androidplatform.net/index.html")

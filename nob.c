@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <sys/stat.h>
+#include <direct.h>
 
 bool is_dir(const char *path) {
     struct stat st;
@@ -93,22 +94,258 @@ bool generate_cmake_lists(const char *path) {
     return true;
 }
 
-bool replace_in_file(const char *path, const char *old_str, const char *new_str) {
+bool copy_dir_recursive(const char *src, const char *dst) {
+    Nob_File_Paths entries = {0};
+    if (!read_entire_dir(src, &entries)) return false;
+    
+    for (size_t i = 0; i < entries.count; ++i) {
+        const char *entry = entries.items[i];
+        if (strcmp(entry, ".") == 0 || strcmp(entry, "..") == 0) continue;
+        
+        char src_path[1024];
+        char dst_path[1024];
+        sprintf(src_path, "%s/%s", src, entry);
+        sprintf(dst_path, "%s/%s", dst, entry);
+        
+        if (is_dir(src_path)) {
+            if (!mkdir_if_not_exists(dst_path)) {
+                da_free(entries);
+                return false;
+            }
+            if (!copy_dir_recursive(src_path, dst_path)) {
+                da_free(entries);
+                return false;
+            }
+        } else {
+            if (!copy_file(src_path, dst_path)) {
+                da_free(entries);
+                return false;
+            }
+        }
+    }
+    da_free(entries);
+    return true;
+}
+
+bool replace_all_in_file(const char *path, const char *old_str, const char *new_str) {
     String_Builder content = {0};
     if (!read_entire_file(path, &content)) return false;
-    char *pos = strstr(content.items, old_str);
-    if (!pos) return true; // not found, assume already correct
+    
+    String_Builder new_content = {0};
+    const char *search_start = content.items;
     size_t old_len = strlen(old_str);
     size_t new_len = strlen(new_str);
-    String_Builder new_content = {0};
-    size_t prefix_len = pos - content.items;
-    da_append_many(&new_content, content.items, prefix_len);
-    da_append_many(&new_content, new_str, new_len);
-    da_append_many(&new_content, pos + old_len, content.count - prefix_len - old_len);
+    
+    while (1) {
+        const char *pos = strstr(search_start, old_str);
+        if (!pos) break;
+        // Copy everything before the match
+        size_t prefix_len = pos - search_start;
+        da_append_many(&new_content, search_start, prefix_len);
+        // Replace the match
+        da_append_many(&new_content, new_str, new_len);
+        // Move past the old string
+        search_start = pos + old_len;
+    }
+    
+    // Copy remaining content
+    da_append_many(&new_content, search_start, strlen(search_start));
+    
     bool result = write_entire_file(path, new_content.items, new_content.count);
     da_free(content);
     da_free(new_content);
     return result;
+}
+
+bool mkdir_recursive(const char *path) {
+    char temp[1024];
+    strcpy(temp, path);
+    for (char *p = temp + 1; *p; ++p) {
+        if (*p == '/' || *p == '\\') {
+            *p = '\0';
+            if (!mkdir_if_not_exists(temp)) return false;
+            *p = '/'; // restore for Windows, but since we're using /, it's fine
+        }
+    }
+    return mkdir_if_not_exists(temp);
+}
+
+const char *get_package_name(void) {
+    static char package_name[256];
+    String_Builder manifest = {0};
+    if (!read_entire_file("android/app/src/main/AndroidManifest.xml", &manifest)) {
+        return NULL;
+    }
+    const char *package_attr = "package=\"";
+    char *pos = strstr(manifest.items, package_attr);
+    if (!pos) {
+        da_free(manifest);
+        return NULL;
+    }
+    pos += strlen(package_attr);
+    char *end = strchr(pos, '"');
+    if (!end) {
+        da_free(manifest);
+        return NULL;
+    }
+    size_t len = end - pos;
+    if (len >= sizeof(package_name)) {
+        da_free(manifest);
+        return NULL;
+    }
+    memcpy(package_name, pos, len);
+    package_name[len] = '\0';
+    da_free(manifest);
+    return package_name;
+}
+
+bool remove_dir_recursive(const char *path) {
+    Nob_File_Paths entries = {0};
+    if (!read_entire_dir(path, &entries)) return false;
+    for (size_t i = 0; i < entries.count; ++i) {
+        const char *entry = entries.items[i];
+        if (strcmp(entry, ".") == 0 || strcmp(entry, "..") == 0) continue;
+        char subpath[1024];
+        sprintf(subpath, "%s/%s", path, entry);
+        if (is_dir(subpath)) {
+            if (!remove_dir_recursive(subpath)) {
+                da_free(entries);
+                return false;
+            }
+        } else {
+            remove(subpath);
+        }
+    }
+    da_free(entries);
+    rmdir(path);
+    return true;
+}
+
+bool validate_android_init(void) {
+    if (file_exists("android/app/build.gradle.kts") != 1) {
+        nob_log(ERROR, "Android project not initialized. Run 'nob android init' first.");
+        return false;
+    }
+    if (file_exists("android/app/src/main/AndroidManifest.xml") != 1) {
+        nob_log(ERROR, "Android manifest missing. Re-run 'nob android init'.");
+        return false;
+    }
+    return true;
+}
+
+bool copy_template_with_replacements(const char *template_dir, const char *target_dir, 
+                                   const char *package_name, const char *app_name) {
+    // Copy the entire template directory
+    if (!copy_dir_recursive(template_dir, target_dir)) return false;
+    
+    // Remove unnecessary Gradle cache directory
+    char gradle_cache_dir[1024];
+    sprintf(gradle_cache_dir, "%s/.gradle", target_dir);
+    remove_dir_recursive(gradle_cache_dir);
+    
+    // Remove the copied java directory
+    char old_java_dir[1024];
+    sprintf(old_java_dir, "%s/app/src/main/java", target_dir);
+    remove_dir_recursive(old_java_dir);
+    
+    // Define the package directory path
+    char package_path[1024];
+    strcpy(package_path, package_name);
+    for (char *p = package_path; *p; ++p) {
+        if (*p == '.') *p = '/';
+    }
+    
+    //  the package directory structure
+    char java_dir[1024];
+    sprintf(java_dir, "%s/app/src/main/java/%s", target_dir, package_path);
+    if (!mkdir_recursive(java_dir)) return false;
+    
+    // Copy Java/Kotlin files from template to new package, replacing placeholders
+    char template_java_dir[1024];
+    sprintf(template_java_dir, "%s/app/src/main/java/com/example/crossweb", template_dir);
+    Nob_File_Paths files = {0};
+    if (read_entire_dir(template_java_dir, &files)) {
+        for (size_t i = 0; i < files.count; ++i) {
+            const char *file = files.items[i];
+            if (strcmp(file, ".") == 0 || strcmp(file, "..") == 0) continue;
+            size_t len = strlen(file);
+            if (len > 3 && (strcmp(file + len - 3, ".kt") == 0 || strcmp(file + len - 5, ".java") == 0)) {
+                char template_file[1024];
+                char new_file[1024];
+                sprintf(template_file, "%s/%s", template_java_dir, file);
+                sprintf(new_file, "%s/%s", java_dir, file);
+                // Read template file, replace placeholders, write to new file
+                String_Builder content = {0};
+                if (!read_entire_file(template_file, &content)) {
+                    da_free(files);
+                    return false;
+                }
+                // Replace {{PACKAGE_NAME}}
+                String_Builder replaced = {0};
+                const char *search = content.items;
+                const char *placeholder = "{{PACKAGE_NAME}}";
+                size_t ph_len = strlen(placeholder);
+                while (1) {
+                    const char *pos = strstr(search, placeholder);
+                    if (!pos) break;
+                    size_t prefix_len = pos - search;
+                    da_append_many(&replaced, search, prefix_len);
+                    da_append_many(&replaced, package_name, strlen(package_name));
+                    search = pos + ph_len;
+                }
+                da_append_many(&replaced, search, strlen(search));
+                // Replace {{APP_NAME}} if app_name
+                if (app_name) {
+                    String_Builder final_content = {0};
+                    search = replaced.items;
+                    placeholder = "{{APP_NAME}}";
+                    ph_len = strlen(placeholder);
+                    while (1) {
+                        const char *pos = strstr(search, placeholder);
+                        if (!pos) break;
+                        size_t prefix_len = pos - search;
+                        da_append_many(&final_content, search, prefix_len);
+                        da_append_many(&final_content, app_name, strlen(app_name));
+                        search = pos + ph_len;
+                    }
+                    da_append_many(&final_content, search, strlen(search));
+                    da_free(replaced);
+                    replaced = final_content;
+                }
+                if (!write_entire_file(new_file, replaced.items, replaced.count)) {
+                    da_free(replaced);
+                    da_free(content);
+                    da_free(files);
+                    return false;
+                }
+                da_free(replaced);
+                da_free(content);
+            }
+        }
+        da_free(files);
+    }
+    
+    // Replace placeholders in all relevant files
+    const char *files_to_replace[] = {
+        "app/build.gradle.kts",
+        "app/src/main/AndroidManifest.xml",
+        "app/src/main/res/layout/activity_main.xml",
+        "app/src/main/res/values/strings.xml",
+        "app/src/main/res/values/styles.xml",
+        "app/proguard-rules.pro",
+        NULL
+    };
+    
+    for (size_t i = 0; files_to_replace[i] != NULL; ++i) {
+        char file_path[1024];
+        sprintf(file_path, "%s/%s", target_dir, files_to_replace[i]);
+        if (file_exists(file_path) == 1) {
+            if (!replace_all_in_file(file_path, "{{PACKAGE_NAME}}", package_name)) return false;
+            if (app_name && !replace_all_in_file(file_path, "{{APP_NAME}}", app_name)) return false;
+        }
+    }
+    
+    return true;
 }
 
 int main(int argc, char **argv)
@@ -175,28 +412,68 @@ int main(int argc, char **argv)
             }
             const char *subcommand = shift_args(&argc, &argv);
             if (strcmp(subcommand, "init") == 0) {
-                // Initialize Android project
-                if (!mkdir_if_not_exists("android")) return 1;
-                int build_gradle_exists = file_exists("android/app/build.gradle");
-                if (build_gradle_exists < 0) return 1;
-                if (build_gradle_exists == 0) {
-                    // Create basic gradle structure
-                    Cmd cmd = {0};
-                    cmd_append(&cmd, "cmd");
-                    cmd_append(&cmd, "/c");
-                    cmd_append(&cmd, "cd");
-                    cmd_append(&cmd, "android");
-                    cmd_append(&cmd, "&&");
-                    cmd_append(&cmd, "gradle");
-                    cmd_append(&cmd, "init");
-                    cmd_append(&cmd, "--type");
-                    cmd_append(&cmd, "basic");
-                    if (!cmd_run(&cmd)) return 1;
+                // Parse command line arguments
+                const char *package_name = "com.example.crossweb";
+                const char *app_name = "Crossweb";
+                
+                while (argc > 0) {
+                    const char *arg = argv[0];
+                    if (strcmp(arg, "--package") == 0 || strcmp(arg, "-p") == 0) {
+                        shift_args(&argc, &argv);
+                        if (argc == 0) {
+                            nob_log(ERROR, "Expected package name after --package");
+                            return 1;
+                        }
+                        package_name = shift_args(&argc, &argv);
+                    } else if (strcmp(arg, "--app-name") == 0 || strcmp(arg, "-n") == 0) {
+                        shift_args(&argc, &argv);
+                        if (argc == 0) {
+                            nob_log(ERROR, "Expected app name after --app-name");
+                            return 1;
+                        }
+                        app_name = shift_args(&argc, &argv);
+                    } else {
+                        nob_log(ERROR, "Unknown argument: %s", arg);
+                        nob_log(ERROR, "Usage: nob android init [--package <package>] [--app-name <name>]");
+                        return 1;
+                    }
                 }
-                // TODO: Add more setup for Android WebView project
-                nob_log(INFO, "Android project initialized in ./android/");
+                
+                // Initialize Android project from template
+                if (!mkdir_if_not_exists("android")) return 1;
+                
+                // Check if android project already exists
+                int build_gradle_exists = file_exists("android/app/build.gradle.kts");
+                if (build_gradle_exists < 0) return 1;
+                if (build_gradle_exists == 1) {
+                    nob_log(ERROR, "Android project already exists in ./android/");
+                    return 1;
+                }
+                
+                // Copy template with replacements
+                if (!copy_template_with_replacements("templates/android", "android", package_name, app_name)) {
+                    nob_log(ERROR, "Failed to copy Android template");
+                    return 1;
+                }
+                
+                nob_log(INFO, "Android project initialized in ./android/ with package '%s' and app name '%s'", package_name, app_name);
                 return 0;
             } else if (strcmp(subcommand, "dev") == 0) {
+                if (!validate_android_init()) return 1;
+                const char *package_name = get_package_name();
+                if (!package_name) {
+                    nob_log(ERROR, "Could not determine package name from AndroidManifest.xml");
+                    return 1;
+                }
+                // Convert package to path
+                char package_path[1024];
+                strcpy(package_path, package_name);
+                for (char *p = package_path; *p; ++p) {
+                    if (*p == '.') *p = '/';
+                }
+                char main_activity_path[1024];
+                sprintf(main_activity_path, "android/app/src/main/java/%s/MainActivity.kt", package_path);
+                
                 // Start Vite dev server in background
                 Cmd cmd = {0};
                 cmd_append(&cmd, "cmd");
@@ -212,7 +489,7 @@ int main(int argc, char **argv)
                 cmd_append(&cmd, "dev");
                 if (!cmd_run(&cmd)) return 1;
                 // Modify MainActivity for dev
-                if (!replace_in_file("android/app/src/main/java/com/example/crossweb/MainActivity.kt", "webView.loadUrl(\"https://www.google.com\")", "webView.loadUrl(\"http://10.0.2.2:5173\")")) return 1;
+                if (!replace_all_in_file(main_activity_path, "webView.loadUrl(\"https://www.google.com\")", "webView.loadUrl(\"http://10.0.2.2:5173\")")) return 1;
                 // Build debug APK
                 cmd = (Cmd){0};
                 cmd_append(&cmd, "cmd");
@@ -256,11 +533,28 @@ int main(int argc, char **argv)
                 cmd_append(&cmd, "am");
                 cmd_append(&cmd, "start");
                 cmd_append(&cmd, "-n");
-                cmd_append(&cmd, "com.example.crossweb/.MainActivity");
+                char activity_name[1024];
+                sprintf(activity_name, "%s/.MainActivity", package_name);
+                cmd_append(&cmd, activity_name);
                 if (!cmd_run(&cmd)) return 1;
                 nob_log(INFO, "Dev mode launched");
                 return 0;
             } else if (strcmp(subcommand, "build") == 0) {
+                if (!validate_android_init()) return 1;
+                const char *package_name = get_package_name();
+                if (!package_name) {
+                    nob_log(ERROR, "Could not determine package name from AndroidManifest.xml");
+                    return 1;
+                }
+                // Convert package to path
+                char package_path[1024];
+                strcpy(package_path, package_name);
+                for (char *p = package_path; *p; ++p) {
+                    if (*p == '.') *p = '/';
+                }
+                char main_activity_path[1024];
+                sprintf(main_activity_path, "android/app/src/main/java/%s/MainActivity.kt", package_path);
+                
                 // Build web assets
                 Cmd cmd = {0};
                 cmd_append(&cmd, "cmd");
@@ -282,7 +576,7 @@ int main(int argc, char **argv)
                 cmd_append(&cmd, "/y");
                 if (!cmd_run(&cmd)) return 1;
                 // Modify MainActivity for local
-                if (!replace_in_file("android/app/src/main/java/com/example/crossweb/MainActivity.kt", "webView.loadUrl(\"http://10.0.2.2:5173\")", "webView.loadUrl(\"file:///android_asset/index.html\")")) return 1;
+                if (!replace_all_in_file(main_activity_path, "webView.loadUrl(\"http://10.0.2.2:5173\")", "webView.loadUrl(\"file:///android_asset/index.html\")")) return 1;
                 // Copy C source files to Android c dir
                 if (!mkdir_if_not_exists("android/app/src/main/c")) return 1;
                 if (!copy_file("src/android_bridge.c", "android/app/src/main/c/android_bridge.c")) return 1;
@@ -323,6 +617,12 @@ int main(int argc, char **argv)
                 nob_log(INFO, "APK built in android/app/build/outputs/apk/release/");
                 return 0;
             } else if (strcmp(subcommand, "run") == 0) {
+                if (!validate_android_init()) return 1;
+                const char *package_name = get_package_name();
+                if (!package_name) {
+                    nob_log(ERROR, "Could not determine package name from AndroidManifest.xml");
+                    return 1;
+                }
                 // Launch emulator if not running
                 Cmd cmd = {0};
                 const char *android_home = getenv("ANDROID_HOME");
@@ -359,7 +659,9 @@ int main(int argc, char **argv)
                 cmd_append(&cmd, "am");
                 cmd_append(&cmd, "start");
                 cmd_append(&cmd, "-n");
-                cmd_append(&cmd, "com.example.crossweb/.MainActivity");
+                char activity_name[1024];
+                sprintf(activity_name, "%s/.MainActivity", package_name);
+                cmd_append(&cmd, activity_name);
                 if (!cmd_run(&cmd)) return 1;
                 nob_log(INFO, "App launched");
                 return 0;

@@ -7,10 +7,10 @@ plugins {
 
 android {
     compileSdk = 36
-    namespace = "com.example.crossweb"
+    namespace = "{{PACKAGE_NAME}}"
     defaultConfig {
         manifestPlaceholders["usesCleartextTraffic"] = "false"
-        applicationId = "com.example.crossweb"
+        applicationId = "{{PACKAGE_NAME}}"
         minSdk = 24
         targetSdk = 36
         versionCode = 1
@@ -80,6 +80,7 @@ val copyPluginSources by tasks.registering(Copy::class) {
     from(pluginsDir) {
         include("**/android/**/*.kt")
         include("**/android/**/*.java")
+        includeEmptyDirs = false
     }
     into(file("$buildDir/generated/pluginSources"))
     eachFile {

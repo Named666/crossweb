@@ -1,4 +1,4 @@
-package com.example.crossweb
+package {{PACKAGE_NAME}}
 
 import android.webkit.*
 import android.util.Log
@@ -35,6 +35,15 @@ class Ipc(val webView: WebView) {
         val safeResult = result.replace("'", "\\'").replace("\n", "").replace("\r", "")
         webView.post {
             webView.evaluateJavascript("window.__native__.onMessage('$id', JSON.parse('$safeResult'))", null)
+        }
+    }
+
+    fun emit(event: String, data: String) {
+        Log.d("CrossWeb", "emit called with event: $event, data: $data")
+        // Send event to JS asynchronously
+        val safeData = data.replace("'", "\\'").replace("\n", "").replace("\r", "")
+        webView.post {
+            webView.evaluateJavascript("if (window.__native__.onEvent) window.__native__.onEvent('$event', JSON.parse('$safeData'))", null)
         }
     }
 

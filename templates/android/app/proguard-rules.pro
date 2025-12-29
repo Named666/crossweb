@@ -17,7 +17,4 @@
     native <methods>;
 }
 
-# Keep KeystoreManager class and its members since it's accessed via JNI
--keep class com.example.crossweb.plugins.keystore.KeystoreManager {
-    *;
-}
+#
