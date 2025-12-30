@@ -13,5 +13,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Crossweb"
+rootProject.name = "{{APP_NAME}}"
 include ':app'

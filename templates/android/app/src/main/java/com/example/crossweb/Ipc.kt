@@ -2,15 +2,23 @@ package {{PACKAGE_NAME}}
 
 import android.webkit.*
 import android.util.Log
+import kotlin.jvm.JvmStatic
+
+import androidx.appcompat.app.AppCompatActivity
 
 class Ipc(val webView: WebView) {
-        private var activity: android.app.Activity? = null
+        private var activity: AppCompatActivity? = null
 
-        fun setActivity(act: android.app.Activity) {
+        fun setActivity(act: AppCompatActivity) {
             activity = act
+            staticActivity = act
         }
 
         fun getContext(): android.content.Context {
+            return activity!!
+        }
+
+        fun getActivity(): AppCompatActivity {
             return activity!!
         }
     @JavascriptInterface
@@ -24,13 +32,13 @@ class Ipc(val webView: WebView) {
     @JavascriptInterface
     fun invoke(cmd: String, payload: String): String {
         val id = java.util.UUID.randomUUID().toString()
-        Log.d("CrossWeb", "invoke called with cmd: $cmd, payload: $payload")
+        Log.d("{{APP_NAME}}", "invoke called with cmd: $cmd, payload: $payload")
         nativeInvoke(id, cmd, payload)
         return id
     }
 
     fun resolveInvoke(id: String, result: String) {
-        Log.d("CrossWeb", "resolveInvoke called with result: $result")
+        Log.d("{{APP_NAME}}", "resolveInvoke called with result: $result")
         // Send back to JS with id
         val safeResult = result.replace("'", "\\'").replace("\n", "").replace("\r", "")
         webView.post {
@@ -39,7 +47,7 @@ class Ipc(val webView: WebView) {
     }
 
     fun emit(event: String, data: String) {
-        Log.d("CrossWeb", "emit called with event: $event, data: $data")
+        Log.d("{{APP_NAME}}", "emit called with event: $event, data: $data")
         // Send event to JS asynchronously
         val safeData = data.replace("'", "\\'").replace("\n", "").replace("\r", "")
         webView.post {
@@ -47,8 +55,11 @@ class Ipc(val webView: WebView) {
         }
     }
 
-    companion object {
-        // Library loaded in MainActivity
+    public companion object {
+        private var staticActivity: AppCompatActivity? = null
+
+        @JvmStatic
+        public fun getStaticActivity(): AppCompatActivity? = staticActivity
     }
 
     private external fun ipc(url: String, message: String)

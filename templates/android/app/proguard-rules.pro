@@ -8,12 +8,12 @@
 # If your project uses WebView with JS, uncomment the following
 # and specify the fully qualified class name to the JavaScript interface
 # class:
--keepclassmembers class com.example.crossweb.Ipc {
+-keepclassmembers class {{PACKAGE_NAME}}.Ipc {
     public *;
 }
 
 # Keep native methods
--keepclasseswithmembernames class com.example.crossweb.Ipc {
+-keepclasseswithmembernames class {{PACKAGE_NAME}}.Ipc {
     native <methods>;
 }
 

@@ -48,35 +48,88 @@ Plugin keystore_plugin = {
 
 #ifdef __ANDROID__
 bool android_keystore_invoke(const char *cmd, const char *payload, RespondCallback respond) {
-    extern JNIEnv *current_env;
-    extern jobject current_obj;
+    extern __thread JNIEnv *current_env;
+    extern __thread jobject current_obj;
 
     if (current_env == NULL || current_obj == NULL) {
         respond("{\"ok\":false,\"msg\":\"JNI not initialized\"}");
         return false;
     }
 
-    // Lookup KeystoreManager class and method IDs locally so we don't hardcode anything in android_bridge.c
-    jclass keystoreClass = (*current_env)->FindClass(current_env, "com/example/crossweb/plugins/keystore/KeystoreManager");
+    // Get Context from current_obj (Ipc instance)
+    jclass ipcClass = (*current_env)->GetObjectClass(current_env, current_obj);
+    jmethodID getContextMethod = (*current_env)->GetMethodID(current_env, ipcClass, "getContext", "()Landroid/content/Context;");
+    if (getContextMethod == NULL) {
+        respond("{\"ok\":false,\"msg\":\"getContext method not found\"}");
+        return false;
+    }
+    jobject context = (*current_env)->CallObjectMethod(current_env, current_obj, getContextMethod);
+    if (context == NULL) {
+        respond("{\"ok\":false,\"msg\":\"Failed to get context\"}");
+        return false;
+    }
+
+    // Clear any pending Java exception from earlier GetMethodID/GetStaticMethodID calls
+    if ((*current_env)->ExceptionCheck(current_env)) {
+        (*current_env)->ExceptionClear(current_env);
+    }
+
+    // Lookup KeystoreManager via the app ClassLoader to avoid FindClass issues on native threads
+    // Obtain ClassLoader via current_obj.getClass().getClassLoader()
+    jobject classLoader = NULL;
+    jmethodID getClassMethod = (*current_env)->GetMethodID(current_env, ipcClass, "getClass", "()Ljava/lang/Class;");
+    if (getClassMethod != NULL) {
+        jobject classObj = (*current_env)->CallObjectMethod(current_env, current_obj, getClassMethod);
+        if (classObj != NULL) {
+            jclass classClass = (*current_env)->FindClass(current_env, "java/lang/Class");
+            if (classClass != NULL) {
+                jmethodID getClassLoaderMethod = (*current_env)->GetMethodID(current_env, classClass, "getClassLoader", "()Ljava/lang/ClassLoader;");
+                if (getClassLoaderMethod != NULL) {
+                    classLoader = (*current_env)->CallObjectMethod(current_env, classObj, getClassLoaderMethod);
+                }
+                (*current_env)->DeleteLocalRef(current_env, classClass);
+            }
+            (*current_env)->DeleteLocalRef(current_env, classObj);
+        }
+    }
+
+    jclass keystoreClass = NULL;
+    if (classLoader != NULL) {
+        jclass classLoaderClass = (*current_env)->FindClass(current_env, "java/lang/ClassLoader");
+        if (classLoaderClass != NULL) {
+            jmethodID loadClassMethod = (*current_env)->GetMethodID(current_env, classLoaderClass, "loadClass", "(Ljava/lang/String;)Ljava/lang/Class;");
+            if (loadClassMethod != NULL) {
+                jstring className = (*current_env)->NewStringUTF(current_env, "__PACKAGE__.plugins.keystore.KeystoreManager");
+                keystoreClass = (jclass)(*current_env)->CallObjectMethod(current_env, classLoader, loadClassMethod, className);
+                (*current_env)->DeleteLocalRef(current_env, className);
+            }
+            (*current_env)->DeleteLocalRef(current_env, classLoaderClass);
+        }
+        (*current_env)->DeleteLocalRef(current_env, classLoader);
+    }
+    // Fallback to FindClass if classLoader approach failed
+    if (keystoreClass == NULL) {
+        keystoreClass = (*current_env)->FindClass(current_env, "__PACKAGE_PATH__/plugins/keystore/KeystoreManager");
+    }
     if (keystoreClass == NULL) {
         respond("{\"ok\":false,\"msg\":\"KeystoreManager class not found\"}");
         return false;
+    }
+
+    // Prefer a Context-based setter: call setActivity(Context) if present.
+    // This avoids relying on exact Activity return-type signatures from Ipc.getActivity().
+    jmethodID setActivityMethod = (*current_env)->GetStaticMethodID(current_env, keystoreClass, "setActivity", "(Landroid/content/Context;)V");
+    if (setActivityMethod != NULL) {
+        (*current_env)->CallStaticVoidMethod(current_env, keystoreClass, setActivityMethod, context);
+        if ((*current_env)->ExceptionCheck(current_env)) {
+            (*current_env)->ExceptionClear(current_env);
+        }
     }
 
     jmethodID encryptMethod = (*current_env)->GetStaticMethodID(current_env, keystoreClass, "encrypt", "([B)Ljava/lang/String;");
     jmethodID decryptMethod = (*current_env)->GetStaticMethodID(current_env, keystoreClass, "decrypt", "(Ljava/lang/String;)[B");
     jmethodID saveMethod = (*current_env)->GetStaticMethodID(current_env, keystoreClass, "save", "(Landroid/content/Context;Ljava/lang/String;)V");
     jmethodID loadMethod = (*current_env)->GetStaticMethodID(current_env, keystoreClass, "load", "(Landroid/content/Context;)Ljava/lang/String;");
-
-    // Get Context from current_obj (Ipc instance)
-    jclass ipcClass = (*current_env)->GetObjectClass(current_env, current_obj);
-    jmethodID getContextMethod = (*current_env)->GetMethodID(current_env, ipcClass, "getContext", "()Landroid/content/Context;");
-    jobject context = (*current_env)->CallObjectMethod(current_env, current_obj, getContextMethod);
-    if (context == NULL) {
-        respond("{\"ok\":false,\"msg\":\"Failed to get context\"}");
-        (*current_env)->DeleteLocalRef(current_env, keystoreClass);
-        return false;
-    }
 
     if (strcmp(cmd, "encrypt") == 0) {
         size_t len = strlen(payload) / 2;

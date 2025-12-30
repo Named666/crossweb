@@ -1,4 +1,4 @@
-package com.example.crossweb.plugins.keystore
+package __PACKAGE__.plugins.keystore
 
 import android.content.Context
 import android.security.keystore.KeyGenParameterSpec
@@ -26,8 +26,24 @@ object KeystoreManager {
 
     private var activity: AppCompatActivity? = null
 
+    @JvmStatic
     fun setActivity(activity: AppCompatActivity) {
         this.activity = activity
+    }
+
+    @JvmStatic
+    fun setActivity(activity: android.app.Activity) {
+        this.activity = activity as? AppCompatActivity
+    }
+
+    @JvmStatic
+    fun setActivity(context: Context) {
+        // Accept a Context fallback; prefer AppCompatActivity when possible
+        this.activity = when (context) {
+            is AppCompatActivity -> context
+            is android.app.Activity -> context as? AppCompatActivity
+            else -> null
+        }
     }
 
     private val Context.secureDataStore: DataStore<Preferences> by preferencesDataStore(name = "secure_prefs")

@@ -72,7 +72,7 @@ dependencies {
 // Copy plugin Android sources (Kotlin/Java) into the app module at build time
 
 val cleanPluginSources by tasks.registering(Delete::class) {
-    delete(file("$buildDir/generated/pluginSources"))
+    delete(file("${project.buildDir.path}/generated/pluginSources"))
 }
 
 val copyPluginSources by tasks.registering(Copy::class) {
@@ -82,19 +82,22 @@ val copyPluginSources by tasks.registering(Copy::class) {
         include("**/android/**/*.java")
         includeEmptyDirs = false
     }
-    into(file("$buildDir/generated/pluginSources"))
+    into(file("${project.buildDir.path}/generated/pluginSources"))
+    val namespace = android.namespace ?: "com.example.crossweb"
+    filter { it.replace("__PACKAGE__", namespace) }
     eachFile {
         val segments = relativePath.segments
         if (segments.size >= 3 && segments[1] == "android") {
-            relativePath = org.gradle.api.file.RelativePath(true, "com", "example", "crossweb", "plugins", segments[0], segments[2])
+            val packageSegments = namespace.split(".")
+            relativePath = org.gradle.api.file.RelativePath(true, *packageSegments.toTypedArray(), "plugins", segments[0], segments[2])
         } else {
             relativePath = org.gradle.api.file.RelativePath(true, relativePath.lastName)
         }
     }
 }
 
-android.sourceSets.getByName("main").java.srcDir(file("$buildDir/generated/pluginSources"))
-android.sourceSets.getByName("main").kotlin.srcDir(file("$buildDir/generated/pluginSources"))
+android.sourceSets.getByName("main").java.srcDir(file("${project.buildDir.path}/generated/pluginSources"))
+android.sourceSets.getByName("main").kotlin.srcDir(file("${project.buildDir.path}/generated/pluginSources"))
 
 tasks.named("preBuild") {
     dependsOn(cleanPluginSources, copyPluginSources)
