@@ -9,6 +9,7 @@ music/
 *.swp
 
 # Nob artifacts
+web/
 build/
 nob
 nob.old
