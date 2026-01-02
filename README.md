@@ -1,91 +1,128 @@
-# CrossWeb
+# Crossweb (Based on Musializer)
 
-<p align=center>
-  <img src="./resources/logo/logo-256.png">
-</p>
+> [!NOTE]
+> This project is a work-in-progress. It serves as both a demonstration application (Musializer) and a reference for the underlying **CrossWeb** framework.
 
-> [!WARNING]
-> This software is unfinished. Keep your expectations low.
+**CrossWeb** is a lightweight, C-based framework for creating cross-platform desktop and mobile applications using modern web technologies for the user interface. It combines a native C backend with a webview container, offering direct access to native capabilities through a flexible plugin system.
 
-CrossWeb is a cross-platform webview framework inspired by Tauri 2.0, built entirely in C. It provides a native webview container with IPC communication between JavaScript and C, hot-reloading for development, and a plugin system for extensibility.
+The entire build process is managed by a custom, dependency-free build system written in C using `nob.h`.
 
-*Please, read [CONTRIBUTING.md](CONTRIBUTING.md) before making a PR.*
+---
 
 ## Features
 
-- Cross-platform webview (WebView2 on Windows, WKWebView on macOS, WebKitGTK on Linux)
-- IPC communication between web app and native C code
-- Hot-reloading for development
-- Plugin system with ABI-stable C interfaces
-- No JavaScript build tools required in the runtime
-- Deterministic builds with nob.h
+-   **Cross-Platform:** Targets Windows (GCC, MSVC, MinGW), macOS, Linux, and Android from a single C codebase.
+-   **Hybrid Architecture:** Leverage web technologies (like Vite, React, Vue, etc.) for the UI and C for performance-critical backend logic.
+-   **Native IPC Bridge:** Secure and efficient communication between the JavaScript frontend and the C backend.
+-   **Extensible Plugin System:** Add native capabilities (like filesystem access, secure storage) that can be called from JavaScript.
+-   **Native Hot-Reloading:** Reload C plugin code on the fly without restarting the application (for desktop development).
+-   **Unified Build System:** A single, simple set of commands to manage, build, and run your project across all supported platforms.
+-   **Android Integration:** Robust support for building, running, and debugging on Android, including automatic JNI bridge generation and plugin integration.
 
-## Supported Platforms
+## Prerequisites
 
-- Windows (MSVC and MinGW GCC)
-- Linux (planned)
-- macOS (planned)
-- Mobile (iOS/Android stubs)
+-   **C Compiler:** A C compiler like GCC, Clang, or MSVC.
+-   **Node.js & npm:** Required for managing the web frontend.
+-   **Android SDK & NDK:** Required only for building and running the Android version. Ensure your `ANDROID_HOME` environment variable is set.
 
+## Build System (`nob`)
 
-## Build from Source
+The project is built using `nob`, a custom tool. To get started, bootstrap it by compiling `nob.c` once:
 
-We are using Custom Build System written entirely in C called `nob`. [nob.c](./nob.c) is the program that builds CrossWeb. For more info on this Build System see the [nob.h repo](https://github.com/tsoding/nob.h).
+```sh
+# On Windows (using GCC)
+gcc nob.c -o nob.exe
 
-Before using `nob` you need to bootstrap it. Just compile it with the available C compiler. On Linux it's usually `$ cc -o nob nob.c` on Windows with GCC it's `cc nob.c -g nob.exe`. You only need to boostrap it once. After the bootstrap you can just keep running the same executable over and over again. It even tries to rebuild itself if you modify [nob.c](./nob.c) (which may fail sometimes, so in that case be ready to reboostrap it).
-
-I really recommend to read [nob.c](./nob.c) and [nob.h](https://github.com/tsoding/nob.h) to get an idea of how it all actually works. The Build System is a work in progress, so if something breaks be ready to dive into it.
-
-### Windows GCC
-
-```console
-$ gcc nob.c -o nob.exe  # ONLY ONCE!!!
-$ ./nob.exe
-```
-$ ./build/crossweb.exe
+# On Linux/macOS
+cc -o nob nob.c
 ```
 
-## Usage
+Once bootstrapped, you can use `nob.exe` (or `./nob`) for all project tasks. It will automatically re-build itself if `nob.c` changes.
 
-Run the built executable:
+## Commands
 
-```console
-$ ./build/crossweb [url]
-```
+The `nob` command-line interface provides a complete workflow for development and building.
 
-If no URL is provided, it loads the local web app from `./web/index.html`.
+### General Project Commands
 
-## Hot Reloading
+| Command           | Description                                                                     |
+| ----------------- | ------------------------------------------------------------------------------- |
+| **`nob init`**    | Initializes a new Vite-based web project in the `web/` directory. Run this first. |
+| **`nob dev`**     | Starts the Vite development server for the web UI.                              |
+| **`nob build`**   | Builds the production-ready web assets in `web/dist/`.                          |
+| **`nob config`**  | Modifies the build configuration (`build/config.h`).                            |
+| **`./nob`**       | Compiles the native desktop application for the host OS.                        |
 
-Edit `./src_build/configurer.c` and enable `CROSSWEB_HOTRELOAD`.
+### Android Commands
 
-```console
-$ ./nob
-$ ./build/crossweb
-```
+| Command                      | Description                                                                                          |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------- |
+| **`nob android init`**       | Generates an Android project in the `android/` directory from a template.                            |
+| **`nob android dev`**        | Runs the app on a connected Android device/emulator, using the live Vite server for the web UI.        |
+| **`nob android build`**      | Compiles and bundles the web assets, C plugins, and Kotlin code into a release-signed APK.             |
+| **`nob android run`**        | Installs and launches the release APK on a connected device/emulator.                                  |
+| **`nob android install`**    | Installs the release APK without launching it.                                                       |
 
-This allows you to modify the plugin code in `src/plug.c` and see changes without restarting the application.
+## Getting Started
 
-## Architecture
+1.  **Bootstrap the build system:**
+    ```sh
+    gcc nob.c -o nob.exe
+    ```
 
-CrossWeb consists of:
+2.  **Initialize the web frontend:**
+    ```sh
+    ./nob.exe init
+    ```
+    Follow the prompts from Vite to set up your preferred web framework (e.g., React, Vue).
 
-- **Webview Layer**: Cross-platform webview using webview-c library
-- **IPC System**: JSON/MessagePack communication between web and native
-- **Plugin System**: ABI-stable C plugins for extensibility
-- **Hot Reload**: Development-time plugin reloading
-- **Build System**: nob.h-based deterministic builds
+3.  **Build and run for Desktop:**
+    - To enable hot-reloading for native C code:
+      ```sh
+      ./nob.exe config hotreload
+      ```
+    - Compile the native host:
+      ```sh
+      ./nob.exe
+      ```
+    - Run the application:
+      ```sh
+      ./build/crossweb.exe
+      ```
 
-## Developing Web Apps
+4.  **Build and run for Android:**
+    - Initialize the Android project structure:
+      ```sh
+      ./nob.exe android init --package com.yourcompany.yourapp --app-name "Your App"
+      ```
+    - Build a release APK:
+      ```sh
+      ./nob.exe android build
+      ```
+    - Run the app on an emulator or device:
+      ```sh
+      ./nob.exe android run
+      ```
 
-Place your web application files in the `./web/` directory. The main entry point should be `./web/index.html`.
+## Architecture Overview
 
-For IPC communication, use the JavaScript functions defined in `index.html` as examples. Messages are sent to the native side and responses are received asynchronously.
+-   **`nob.c`**: The entry point for the stage-1 build system. It handles CLI commands and can compile a stage-2 builder for platform-specific tasks.
+-   **`src/`**: Contains the core C source code for the native backend.
+    -   `webview.c`: The main entry point for the native application host.
+    -   `plug.c` / `plug.h`: The core plugin and IPC message routing system.
+    -   `ipc.c` / `ipc.h`: Handles the low-level message passing between JS and C.
+    -   `plugins/`: Home for native plugins like `fs` and `keystore`.
+-   **`src_build/`**: The source code for the build system itself. It's compiled by `nob.c`.
+-   **`web/`**: The source code for the web-based UI, typically a Vite project.
+-   **`android/`**: The generated Android project.
+-   **`templates/`**: Contains templates for generating new projects (e.g., the Android project structure).
 
-## Contributing
+## Plugin Development
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines.
+Plugins are the primary way to extend the native capabilities of the application.
 
-Keep the app running. Rebuild with `./nob`. Hot reload by focusing on the window of the app and pressing <kbd>h</kbd>.
+1.  **Create a Plugin:** Add a new directory in `src/plugins/`. For example, `src/plugins/myplugin/`.
+2.  **Implement the Plugin:** A plugin is a `.c` file that defines and registers a `Plugin` struct. It includes functions for initialization, command invocation, and cleanup.
+3.  **Expose to JavaScript:** Use the `invokeNative(command, payload)` function from `src/plugins/ipc/ipc.js` in your frontend code to call your plugin's commands. The `command` string is typically formatted as `"pluginName.functionName"`.
 
-The way it works is by putting the majority of the logic of the application into a `libplug` dynamic library and just reloading it when requested. The [rpath](https://en.wikipedia.org/wiki/Rpath) (aka hard-coded run-time search path) for that library is set to `.` and `./build/`. See [src_build/nob_win64_msvc.c](src_build/nob_win64_msvc.c) for more information on how everything is configured.
+The framework handles routing the call to the correct C function, passing the payload, and returning the result asynchronously to JavaScript.
