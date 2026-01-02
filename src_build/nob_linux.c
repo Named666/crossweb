@@ -11,28 +11,23 @@ bool build_musializer(void)
     // Like `clang` for instance
     cmd_append(&cmd, "cc",
         "-Wall", "-Wextra", "-ggdb",
-        "-I.", "-I"RAYLIB_SRC_FOLDER,
+        "-I.",
         "-fPIC", "-shared",
         "-o", "./build/libplug.so",
         "./src/plug.c", "./src/ffmpeg_posix.c", "./thirdparty/tinyfiledialogs.c",
-        temp_sprintf("-L./build/raylib/%s", MUSIALIZER_TARGET_NAME), "-l:libraylib.so",
         "-O3", "-march=native", "-ffast-math",
         "-lm", "-ldl", "-flto=auto", "-lpthread");
     if (!cmd_run(&cmd)) return_defer(false);
 
     cmd_append(&cmd, "cc",
         "-Wall", "-Wextra", "-ggdb",
-        "-I.", "-I"RAYLIB_SRC_FOLDER,
+        "-I.",
         "-o", "./build/musializer",
-        "./src/musializer.c", "./src/hotreload_posix.c",
+        "./src/webview.c", "./src/hotreload_posix.c",
         "-Wl,-rpath=./build/",
         "-Wl,-rpath=./",
-        temp_sprintf("-Wl,-rpath=./build/raylib/%s", MUSIALIZER_TARGET_NAME),
-        // NOTE: just in case somebody wants to run musializer from within the ./build/ folder
-        temp_sprintf("-Wl,-rpath=./raylib/%s", MUSIALIZER_TARGET_NAME),
-        temp_sprintf("-L./build/raylib/%s", MUSIALIZER_TARGET_NAME),
         "-O3", "-march=native", "-ffast-math",
-        "-l:libraylib.so", "-lm", "-ldl", "-flto=auto", "-lpthread");
+        "-lm", "-ldl", "-flto=auto", "-lpthread");
     if (!cmd_run(&cmd)) return_defer(false);
 
     if (!procs_flush(&procs)) return_defer(false);
@@ -40,10 +35,8 @@ bool build_musializer(void)
     cmd_append(&cmd, "cc",
         "-Wall", "-Wextra", "-ggdb",
         "-I.",
-        "-I"RAYLIB_SRC_FOLDER,
         "-o", "./build/musializer",
-        "./src/plug.c", "./src/ffmpeg_posix.c", "./src/musializer.c", "./thirdparty/tinyfiledialogs.c",
-        temp_sprintf("-L./build/raylib/%s", MUSIALIZER_TARGET_NAME), "-l:libraylib.a",
+        "./src/plug.c", "./src/ffmpeg_posix.c", "./src/webview.c", "./thirdparty/tinyfiledialogs.c",
         "-O3", "-march=native", "-ffast-math",
         "-lm", "-ldl", "-flto=auto", "-lpthread");
     if (!cmd_run(&cmd)) return_defer(false);
@@ -52,73 +45,6 @@ bool build_musializer(void)
 defer:
     cmd_free(cmd);
     da_free(procs);
-    return result;
-}
-
-bool build_raylib(void)
-{
-    bool result = true;
-    Cmd cmd = {0};
-    File_Paths object_files = {0};
-
-    if (!mkdir_if_not_exists("./build/raylib")) {
-        return_defer(false);
-    }
-
-    Procs procs = {0};
-
-    const char *build_path = temp_sprintf("./build/raylib/%s", MUSIALIZER_TARGET_NAME);
-
-    if (!mkdir_if_not_exists(build_path)) {
-        return_defer(false);
-    }
-
-    for (size_t i = 0; i < ARRAY_LEN(raylib_modules); ++i) {
-        const char *input_path = temp_sprintf(RAYLIB_SRC_FOLDER"%s.c", raylib_modules[i]);
-        const char *output_path = temp_sprintf("%s/%s.o", build_path, raylib_modules[i]);
-        output_path = temp_sprintf("%s/%s.o", build_path, raylib_modules[i]);
-
-        da_append(&object_files, output_path);
-
-        if (needs_rebuild(output_path, &input_path, 1)) {
-            cmd_append(&cmd, "cc",
-                "-ggdb", "-DPLATFORM_DESKTOP", "-D_GLFW_X11", "-fPIC", "-DSUPPORT_FILEFORMAT_FLAC=1",
-                "-I"RAYLIB_SRC_FOLDER"external/glfw/include",
-                "-c", input_path,
-                "-o", output_path);
-            if (!cmd_run(&cmd, .async = &procs)) return_defer(false);
-        }
-    }
-
-    if (!procs_flush(&procs)) return_defer(false);
-
-#ifndef MUSIALIZER_HOTRELOAD
-    const char *libraylib_path = temp_sprintf("%s/libraylib.a", build_path);
-
-    if (needs_rebuild(libraylib_path, object_files.items, object_files.count)) {
-        cmd_append(&cmd, "ar", "-crs", libraylib_path);
-        for (size_t i = 0; i < ARRAY_LEN(raylib_modules); ++i) {
-            const char *input_path = temp_sprintf("%s/%s.o", build_path, raylib_modules[i]);
-            cmd_append(&cmd, input_path);
-        }
-        if (!cmd_run(&cmd)) return_defer(false);
-    }
-#else
-    const char *libraylib_path = temp_sprintf("%s/libraylib.so", build_path);
-
-    if (needs_rebuild(libraylib_path, object_files.items, object_files.count)) {
-        cmd_append(&cmd, "cc", "-shared", "-o", libraylib_path);
-        for (size_t i = 0; i < ARRAY_LEN(raylib_modules); ++i) {
-            const char *input_path = temp_sprintf("%s/%s.o", build_path, raylib_modules[i]);
-            cmd_append(&cmd, input_path);
-        }
-        if (!cmd_run(&cmd)) return_defer(false);
-    }
-#endif // MUSIALIZER_HOTRELOAD
-
-defer:
-    cmd_free(cmd);
-    da_free(object_files);
     return result;
 }
 

@@ -1,4 +1,4 @@
-#define CONFIG_PATH "./src/config.h"
+#define CONFIG_PATH "./build/config.h"
 
 #include <ctype.h>
 
@@ -34,7 +34,7 @@ static Target_Flag target_flags[] = {
     {
         .macro = "CROSSWEB_TARGET_WIN64_GCC",
         .name = "win64-gcc",
-        .enabled_by_default = false,
+        .enabled_by_default = true,
     },
     {
         .macro = "CROSSWEB_TARGET_WIN64_MSVC",
@@ -64,7 +64,7 @@ static Target_Flag target_flags[] = {
     {
         .macro = "CROSSWEB_TARGET_ANDROID",
         .name = "android",
-        .enabled_by_default = true,
+        .enabled_by_default = false,
     },
     {
         .macro = "CROSSWEB_TARGET_IOS",
@@ -134,7 +134,7 @@ bool generate_config_logger(const char *file_path)
     }
 
     genf(f, "#include <stdio.h>\n");
-    genf(f, "#include \"../src/config.h\"\n");
+    genf(f, "#include \"../build/config.h\"\n");
     genf(f, "\n");
     genf(f, "int main(int argc, char **argv) {\n");
     genf(f, "    (void)argc; (void)argv;\n");

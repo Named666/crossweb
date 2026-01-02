@@ -4,7 +4,7 @@
 #include <stdbool.h>
 
 #include "plug.h"
-#include "config.h"
+#include "common.h"
 
 #ifdef CROSSWEB_HOTRELOAD
     #define PLUG(name, ...) extern name##_t *name;

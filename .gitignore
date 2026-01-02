@@ -1,5 +1,5 @@
-# Music folder for testing. Ignoring to prevent accidental copyright infringement.
-music/
+# Android folder for testing. Ignoring
+android/
 
 # Musializer output
 *.mp4

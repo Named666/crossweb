@@ -1,5 +1,5 @@
 #include "plugins.h"
-#include "config.h"
+#include "common.h"
 #include "common.h"
 #include <string.h>
 
@@ -61,7 +61,7 @@ bool copy_plugins_for_android(void) {
         da_free(src_files);
         // For guest-js/
         char guest_js_src[1024];
-        sprintf(guest_js_src, "src/plugins/%s/guest-js", plugin_name);
+        sprintf(guest_js_src, "src/plugins/%s/js", plugin_name);
         if (file_exists(guest_js_src) == 1) {
             Nob_Cmd copy_cmd = {0};
             nob_cmd_append(&copy_cmd, "xcopy");

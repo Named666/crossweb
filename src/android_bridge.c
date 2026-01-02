@@ -136,48 +136,6 @@ JNIEXPORT void JNICALL Java___PACKAGE_MANGLED___Ipc_nativeInvoke(JNIEnv *env, jo
     (*env)->ReleaseStringUTFChars(env, jpayload, payload);
 }
 
-// JNI functions for CWebViewClient
-JNIEXPORT jstring JNICALL Java___PACKAGE_MANGLED___CWebViewClient_assetLoaderDomain(JNIEnv *env, jobject obj) {
-    return (*env)->NewStringUTF(env, "appassets.androidplatform.net");
-}
-
-JNIEXPORT jboolean JNICALL Java___PACKAGE_MANGLED___CWebViewClient_withAssetLoader(JNIEnv *env, jobject obj) {
-    return JNI_FALSE;
-}
-
-JNIEXPORT jobject JNICALL Java___PACKAGE_MANGLED___CWebViewClient_handleRequest(JNIEnv *env, jobject obj, jstring jwebviewId, jobject jrequest, jboolean jisDocumentStartScriptEnabled) {
-    // TODO: implement request handling
-    return NULL;
-}
-
-JNIEXPORT jboolean JNICALL Java___PACKAGE_MANGLED___CWebViewClient_shouldOverride(JNIEnv *env, jobject obj, jstring jurl) {
-    // TODO: implement URL override logic
-    return JNI_FALSE;
-}
-
-JNIEXPORT void JNICALL Java___PACKAGE_MANGLED___CWebViewClient_onPageLoading(JNIEnv *env, jobject obj, jstring jurl) {
-    // TODO: handle page loading
-}
-
-JNIEXPORT void JNICALL Java___PACKAGE_MANGLED___CWebViewClient_onPageLoaded(JNIEnv *env, jobject obj, jstring jurl) {
-    // TODO: handle page loaded
-}
-
-// JNI functions for CWebView
-JNIEXPORT jboolean JNICALL Java___PACKAGE_MANGLED___CWebView_shouldOverride(JNIEnv *env, jobject obj, jstring jurl) {
-    // TODO: implement URL override logic
-    return JNI_FALSE;
-}
-
-JNIEXPORT void JNICALL Java___PACKAGE_MANGLED___CWebView_onEval(JNIEnv *env, jobject obj, jint id, jstring jresult) {
-    // TODO: handle eval result
-}
-
-// JNI functions for CWebChromeClient
-JNIEXPORT void JNICALL Java___PACKAGE_MANGLED___CWebChromeClient_handleReceivedTitle(JNIEnv *env, jobject obj, jobject jwebview, jstring jtitle) {
-    // TODO: handle received title
-}
-
 JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
     JNIEnv *env;
     if ((*vm)->GetEnv(vm, (void **)&env, JNI_VERSION_1_6) != JNI_OK) {

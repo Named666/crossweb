@@ -1,5 +1,3 @@
-#define CROSSWEB_TARGET_NAME "win64-msvc"
-
 bool build_crossweb(void)
 {
     bool result = true;

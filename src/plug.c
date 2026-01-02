@@ -1,4 +1,3 @@
-#include "config.h"
 #include "plug.h"
 #include "ipc.h"
 #ifdef CROSSWEB_PLUGIN_KEYSTORE

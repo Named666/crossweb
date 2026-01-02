@@ -15,4 +15,9 @@ bool replace_all_in_file(const char *path, const char *old_str, const char *new_
 void mangle_package_name(char *mangled, const char *package_name);
 void slash_package_name(char *slashed, const char *package_name);
 
+// Build/project helpers (moved from config.c)
+const char *get_package_name(void);
+bool is_plugin_enabled(const char *plugin_name);
+bool validate_android_init(void);
+
 #endif // COMMON_H_
