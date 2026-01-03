@@ -1,5 +1,17 @@
 # Plugin System Implementation Specification Plan
 
+Plugin System
+
+Crossweb supports dynamically loadable native plugins written in C.
+
+Plugin Characteristics
+
+- Stable ABI
+- Explicit capability declaration
+- Platform-independent interface
+
+Plugins register commands and events with the core runtime at load time. Permission checks are enforced centrally.
+
 ## Overview
 This document outlines the detailed implementation plan for the CrossWeb plugin system, enabling native functionality access from JavaScript in a cross-platform manner.
 
@@ -49,10 +61,10 @@ This document outlines the detailed implementation plan for the CrossWeb plugin 
 ### 2.2 JavaScript Bridge
 ```javascript
 // Invoke command
-const result = await window.__native__.invoke('plugin.command', { param1: 'value1' });
+const result = await window.external.invoke('plugin.command', { param1: 'value1' });
 
 // Listen for events
-window.__native__.listen('plugin.event', (data) => {
+window.external.listen('plugin.event', (data) => {
   console.log('Event received:', data);
 });
 ```
