@@ -12,10 +12,8 @@ bool build_crossweb(void)
             nob_cmd_append(&cmd, "/Fobuild\\", "/Fe./build/libplug.dll");
             nob_cmd_append(&cmd, "/I", "./");
             nob_cmd_append(&cmd, "/I", "webview-c/ms.webview2/include");
-            nob_cmd_append(&cmd,
-                "src/plug.c",
-                "src/ipc.c",
-                "src/webview.c");
+            nob_cmd_append(&cmd, "/DCROSSWEB_BUILDING_PLUG=1");
+            nob_cmd_append(&cmd, "/DWEBVIEW_WINAPI=1");
             nob_cmd_append(&cmd,
                 "/link",
                 "user32.lib", "ole32.lib", "oleaut32.lib");
@@ -25,9 +23,8 @@ bool build_crossweb(void)
             nob_cmd_append(&cmd, "cl.exe");
             nob_cmd_append(&cmd, "/I", "./");
             nob_cmd_append(&cmd, "/I", "webview-c/ms.webview2/include");
-            nob_cmd_append(&cmd, "/Fobuild\\", "/Febuild\\crossweb.exe");
+            nob_cmd_append(&cmd, "/DWEBVIEW_WINAPI=1");
             nob_cmd_append(&cmd,
-                "./src/webview_main.c",
                 "./src/hotreload_windows.c",
                 "./src/webview.c");
             nob_cmd_append(&cmd,
@@ -41,9 +38,8 @@ bool build_crossweb(void)
         nob_cmd_append(&cmd, "cl.exe");
         nob_cmd_append(&cmd, "/I", "./");
         nob_cmd_append(&cmd, "/I", "webview-c/ms.webview2/include");
-        nob_cmd_append(&cmd, "/Fobuild\\", "/Febuild\\crossweb.exe");
+        nob_cmd_append(&cmd, "/DWEBVIEW_WINAPI=1");
         nob_cmd_append(&cmd,
-            "./src/webview_main.c",
             "./src/plug.c",
             "./src/ipc.c",
             "./src/webview.c",
@@ -69,6 +65,8 @@ bool build_dist(void)
 #else
     if (!nob_mkdir_if_not_exists("./crossweb-win64-msvc/")) return false;
     if (!nob_copy_file("./build/crossweb.exe", "./crossweb-win64-msvc/crossweb.exe")) return false;
+    // Required for the WebView2 (Edge/Chromium) backend.
+    if (!nob_copy_file("./webview-c/ms.webview2/x64/WebView2Loader.dll", "./crossweb-win64-msvc/WebView2Loader.dll")) return false;
     if (!nob_copy_directory_recursively("./web/", "./crossweb-win64-msvc/web/")) return false;
     Nob_Cmd cmd = {0};
     const char *dist_path = "./crossweb-win64-msvc.zip";

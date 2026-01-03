@@ -1,32 +1,198 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
 
 #ifndef _WIN32
 #include <signal.h>
 #include <unistd.h>
 #else
+#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+
+
+#define WEBVIEW_IMPLEMENTATION
+#include "./thirdparty/webview-c/webview.h"
 #endif
 
 #include "hotreload.h"
 #include "plug.h"
 
+#ifdef _WIN32
+
+static char g_start_url[MAX_PATH * 4];
+
+static bool file_exists(const char *path) {
+    DWORD attrs = GetFileAttributesA(path);
+    return attrs != INVALID_FILE_ATTRIBUTES && (attrs & FILE_ATTRIBUTE_DIRECTORY) == 0;
+}
+
+static void ensure_webview2_loader_path(void) {
+    // webview-c loads WebView2 via LoadLibraryA("WebView2Loader.dll") and allows
+    // overriding the location via WEBVIEW2_WIN32_PATH.
+    if (getenv("WEBVIEW2_WIN32_PATH") != NULL) {
+        return;
+    }
+
+    char exe_path[MAX_PATH * 4] = {0};
+    DWORD n = GetModuleFileNameA(NULL, exe_path, (DWORD)sizeof(exe_path));
+    if (n == 0 || n >= sizeof(exe_path)) {
+        return;
+    }
+
+    // Strip filename to get exe directory.
+    for (char *p = exe_path + n; p != exe_path; --p) {
+        if (*p == '\\' || *p == '/') {
+            *p = '\0';
+            break;
+        }
+    }
+
+    char candidate[MAX_PATH * 4];
+    const char *dll_name = "WebView2Loader.dll";
+
+    // 1) Exe directory
+    snprintf(candidate, sizeof(candidate), "%s\\%s", exe_path, dll_name);
+    if (file_exists(candidate)) {
+        SetEnvironmentVariableA("WEBVIEW2_WIN32_PATH", exe_path);
+        return;
+    }
+
+    // 2) Repo layout fallbacks for dev runs:
+    //    <exeDir>\..\webview-c\ms.webview2\x64\WebView2Loader.dll
+    //    <exeDir>\..\..\webview-c\ms.webview2\x64\WebView2Loader.dll
+    static const char *rel_folders[] = {
+        ".\\thirdparty\\webview-c\\ms.webview2\\x64",
+        "..\\..\\thirdparty\\webview-c\\ms.webview2\\x64",
+        "..\\..\\..\\thirdparty\\webview-c\\ms.webview2\\x64",
+    };
+
+    for (size_t i = 0; i < sizeof(rel_folders) / sizeof(rel_folders[0]); ++i) {
+        char folder[MAX_PATH * 4];
+        snprintf(folder, sizeof(folder), "%s\\%s", exe_path, rel_folders[i]);
+        snprintf(candidate, sizeof(candidate), "%s\\%s", folder, dll_name);
+        if (file_exists(candidate)) {
+            SetEnvironmentVariableA("WEBVIEW2_WIN32_PATH", folder);
+            return;
+        }
+    }
+}
+
+static bool append_url_char(char **cursor, size_t *remaining, unsigned char ch) {
+    if (*remaining <= 1) return false;
+    if (ch == '\\') {
+        **cursor = '/';
+        (*cursor)++;
+        (*remaining)--;
+        return true;
+    }
+    if (ch == ' ' || ch == '#' || ch == '%' || ch == '?') {
+        if (*remaining < 4) return false;
+        int written = snprintf(*cursor, *remaining, "%%%02X", ch);
+        if (written != 3) return false;
+        *cursor += 3;
+        *remaining -= 3;
+        return true;
+    }
+    **cursor = (char)ch;
+    (*cursor)++;
+    (*remaining)--;
+    return true;
+}
+
+static bool path_to_file_url(const char *path, char *out, size_t out_size) {
+    if (out_size < 10) return false;
+    strcpy(out, "file:///");
+    char *cursor = out + strlen(out);
+    size_t remaining = out_size - (size_t)(cursor - out);
+    for (const unsigned char *p = (const unsigned char *)path; *p; ++p) {
+        if (!append_url_char(&cursor, &remaining, *p)) {
+            return false;
+        }
+    }
+    if (remaining == 0) {
+        return false;
+    }
+    *cursor = '\0';
+    return true;
+}
+
+static bool resolve_start_url(void) {
+    // Use Vite development server
+    strcpy(g_start_url, "http://localhost:5173");
+    return true;
+}
+
+static void handle_external_invoke(struct webview *wv, const char *arg) {
+    (void)wv;
+    if (!ipc_handle_js_message(arg)) {
+        fprintf(stderr, "IPC: dropped malformed message\n");
+    }
+}
+
+static void configure_webview(struct webview *wv) {
+    memset(wv, 0, sizeof(*wv));
+    wv->title = "Crossweb";
+    wv->url = g_start_url;
+    wv->width = 1280;
+    wv->height = 800;
+    wv->resizable = 1;
+    wv->debug = 1;
+    wv->external_invoke_cb = handle_external_invoke;
+}
+
+int main(void) {
+    if (!resolve_start_url()) {
+        return 1;
+    }
+
+    ensure_webview2_loader_path();
+
+    if (!reload_libplug()) {
+        return 1;
+    }
+
+    struct webview wv;
+    configure_webview(&wv);
+    if (webview_init(&wv) != 0) {
+        fprintf(stderr, "Failed to initialize WebView2 host\n");
+        return 1;
+    }
+
+    plug_init((webview_t)&wv);
+
+    bool running = true;
+    while (running && webview_loop(&wv, 1) == 0) {
+#ifdef CROSSWEB_HOTRELOAD
+        if (reload_libplug_changed()) {
+            void *state = plug_pre_reload();
+            if (!reload_libplug()) {
+                running = false;
+                break;
+            }
+            plug_post_reload(state);
+        }
+#endif
+        plug_update((webview_t)&wv);
+    }
+
+    plug_cleanup((webview_t)&wv);
+    webview_exit(&wv);
+    return 0;
+}
+
+#else // !_WIN32
+
 int main(void)
 {
-#ifndef _WIN32
     struct sigaction act = {0};
     act.sa_handler = SIG_IGN;
     sigaction(SIGPIPE, &act, NULL);
-#endif
 
     if (!reload_libplug()) return 1;
 
-    // Initialize plugins with a NULL webview for now
     plug_init((webview_t)NULL);
 
-    // Simple run loop. In a real webview-based binary this would run the
-    // platform webview event loop and call `plug_update(webview)` from it.
     for (;;) {
 #ifdef CROSSWEB_HOTRELOAD
         if (reload_libplug_changed()) {
@@ -36,13 +202,11 @@ int main(void)
         }
 #endif
         plug_update((webview_t)NULL);
-#ifdef _WIN32
-        Sleep(16);
-#else
         usleep(16 * 1000);
-#endif
     }
 
     plug_cleanup((webview_t)NULL);
     return 0;
 }
+
+#endif

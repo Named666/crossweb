@@ -32,10 +32,18 @@ bool plug_load(const char *path) {
     return false;
 }
 
-void plug_init(webview_t wv) {
-    if (wv != NULL) {
-        ipc_init(wv);  // Set up IPC listener
+static char pending_invoke_id[IPC_MAX_ID_LEN] = {0};
+
+static void respond_to_js(const char *response) {
+    if (pending_invoke_id[0] == '\0') {
+        return;
     }
+    const char *payload = response ? response : "{\"ok\":true}";
+    ipc_send_response(pending_invoke_id, payload);
+}
+
+void plug_init(webview_t wv) {
+    ipc_init(wv);
     // Register built-in plugins
 #ifdef CROSSWEB_PLUGIN_KEYSTORE
     plug_register(&keystore_plugin);
@@ -89,6 +97,10 @@ void plug_emit(const char *event, const char *data) {
         (*global_env)->DeleteLocalRef(global_env, jevent);
         (*global_env)->DeleteLocalRef(global_env, jdata);
     }
+#elif defined(_WIN32)
+    if (event) {
+        ipc_emit_event(event, data ? data : "null");
+    }
 #endif
 }
 
@@ -96,8 +108,17 @@ void plug_update(webview_t wv) {
     // Handle IPC messages
     IpcMessage msg;
     while (ipc_receive(&msg)) {
-        // Route to plugins
-        plug_invoke(msg.cmd, msg.payload, NULL); // For desktop, respond via IPC
+        if (wv != NULL) {
+            char previous_id[IPC_MAX_ID_LEN];
+            memcpy(previous_id, pending_invoke_id, sizeof(previous_id));
+            strncpy(pending_invoke_id, msg.id, sizeof(pending_invoke_id) - 1);
+            pending_invoke_id[sizeof(pending_invoke_id) - 1] = '\0';
+            plug_invoke(msg.cmd, msg.payload, respond_to_js);
+            memcpy(pending_invoke_id, previous_id, sizeof(pending_invoke_id));
+        } else {
+            // No webview attached (e.g., Android JNI path)
+            plug_invoke(msg.cmd, msg.payload, NULL);
+        }
     }
     // TODO: Handle platform events and call plugin event handlers
 }

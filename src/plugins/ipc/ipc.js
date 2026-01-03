@@ -5,6 +5,7 @@ const pending = {};
 let nativeListenerInstalled = false;
 
 export function isNative() {
+  console.log('isNative check:', typeof window !== 'undefined', window && window.__native__, window && window.__native__ && typeof window.__native__.invoke === 'function');
   return typeof window !== 'undefined' && window.__native__ && typeof window.__native__.invoke === 'function';
 }
 
@@ -28,6 +29,7 @@ export function invokeNative(cmd, payload) {
     if (!isNative()) return reject(new Error('native bridge not available'));
     try {
       installListener();
+      console.log(`Invoking native command: ${cmd} with payload:`, payload);
       const id = window.__native__.invoke(cmd, payload);
       pending[id] = { resolve, reject };
       // timeout to avoid forever-hanging promises

@@ -38,6 +38,9 @@ bool build_musializer(void)
     cmd_append(&cmd, "x86_64-w64-mingw32-gcc");
     cmd_append(&cmd, "-mwindows", "-Wall", "-Wextra", "-ggdb");
     cmd_append(&cmd, "-I.");
+    cmd_append(&cmd, "-DWEBVIEW_WINAPI");
+    cmd_append(&cmd, "-DWEBVIEW2_WIN32");
+    cmd_append(&cmd, "-I ./thirdparty/webview-c/ms.webview2/include");
     cmd_append(&cmd, "-o", "./build/musializer");
     cmd_append(&cmd,
         "./src/webview.c",
@@ -50,6 +53,9 @@ bool build_musializer(void)
     cmd_append(&cmd, "x86_64-w64-mingw32-gcc");
     cmd_append(&cmd, "-mwindows", "-Wall", "-Wextra", "-ggdb");
     cmd_append(&cmd, "-I.");
+    cmd_append(&cmd, "-DWEBVIEW_WINAPI");
+    cmd_append(&cmd, "-DWEBVIEW2_WIN32");
+    cmd_append(&cmd, "-I ./thirdparty/webview-c/ms.webview2/include");
     cmd_append(&cmd, "-o", "./build/musializer");
     cmd_append(&cmd,
         "./src/plug.c",

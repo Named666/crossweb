@@ -4,18 +4,8 @@
 #include <stdbool.h>
 
 #include "plug.h"
-#include "common.h"
 
-#ifdef CROSSWEB_HOTRELOAD
-    #define PLUG(name, ...) extern name##_t *name;
-    LIST_OF_PLUGS
-    #undef PLUG
-    bool reload_libplug(void);
-    bool reload_libplug_changed(void);
-#else
-    #define PLUG(name, ret, ...) ret name(__VA_ARGS__);
-    LIST_OF_PLUGS
-    #undef PLUG
-#endif // CROSSWEB_HOTRELOAD
+bool reload_libplug(void);
+bool reload_libplug_changed(void);
 
 #endif // HOTRELOAD_H_

@@ -22,8 +22,9 @@ The entire build process is managed by a custom, dependency-free build system wr
 ## Prerequisites
 
 -   **C Compiler:** A C compiler like GCC, Clang, or MSVC.
--   **Node.js & npm:** Required for managing the web frontend.
+-   **Node.js, npm & Vite:** Required for managing the web frontend.
 -   **Android SDK & NDK:** Required only for building and running the Android version. Ensure your `ANDROID_HOME` environment variable is set.
+-   **Gradle:** For building the Android project.
 
 ## Build System (`nob`)
 

@@ -8,7 +8,7 @@
 
 int main(int argc, char **argv)
 {
-    NOB_GO_REBUILD_URSELF_PLUS(argc, argv, "./thirdparty/nob.h", "./src_build/configurer.c");
+    NOB_GO_REBUILD_URSELF_PLUS(argc, argv, "./thirdparty/nob.h", "./src_build/configurer.c", "./src_build/nob_cli.c");
     const char *target_string = NULL;
     int config_exists = file_exists(CONFIG_PATH);
     if (config_exists < 0) return 1;
@@ -36,7 +36,11 @@ int main(int argc, char **argv)
 
     Cmd cmd = {0};
     const char *stage2_binary = "build/nob_stage2";
+    // First rebuild the stage2 binary
     cmd_append(&cmd, NOB_REBUILD_URSELF(stage2_binary, target_string));
+    if (!cmd_run(&cmd)) return 1;
+
+    // Then invoke the freshly built stage2 binary with the original argv
     cmd_append(&cmd, stage2_binary);
     da_append_many(&cmd, argv, argc);
     if (!cmd_run(&cmd)) return 1;

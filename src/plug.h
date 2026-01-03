@@ -31,6 +31,7 @@ typedef struct Plugin {
     PLUG(plug_load_resource, void*, const char*, size_t*) \
     PLUG(plug_free_resource, void, void*) \
     PLUG(plug_update, void, webview_t) \
+    PLUG(ipc_handle_js_message, bool, const char*) \
     PLUG(plug_cleanup, void, webview_t) \
     PLUG(plug_invoke, void, const char*, const char*, RespondCallback) \
     PLUG(plug_emit, void, const char*, const char*)
@@ -39,7 +40,11 @@ typedef struct Plugin {
 LIST_OF_PLUGS
 #undef PLUG
 
-#define PLUG(name, ret, ...) extern ret name(__VA_ARGS__);
+#if defined(CROSSWEB_HOTRELOAD) && !defined(CROSSWEB_BUILDING_PLUG)
+#define PLUG(name, ret, ...) extern name##_t *name;
+#else
+#define PLUG(name, ret, ...) ret name(__VA_ARGS__);
+#endif
 LIST_OF_PLUGS
 #undef PLUG
 
