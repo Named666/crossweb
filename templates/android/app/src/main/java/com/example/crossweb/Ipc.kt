@@ -42,7 +42,7 @@ class Ipc(val webView: WebView) {
         // Send back to JS with id
         val safeResult = result.replace("'", "\\'").replace("\n", "").replace("\r", "")
         webView.post {
-            webView.evaluateJavascript("window.__native__.onMessage('$id', JSON.parse('$safeResult'))", null)
+            webView.evaluateJavascript("window.external.onMessage('$id', JSON.parse('$safeResult'))", null)
         }
     }
 
@@ -51,7 +51,7 @@ class Ipc(val webView: WebView) {
         // Send event to JS asynchronously
         val safeData = data.replace("'", "\\'").replace("\n", "").replace("\r", "")
         webView.post {
-            webView.evaluateJavascript("if (window.__native__.onEvent) window.__native__.onEvent('$event', JSON.parse('$safeData'))", null)
+            webView.evaluateJavascript("if (window.external.onEvent) window.external.onEvent('$event', JSON.parse('$safeData'))", null)
         }
     }
 

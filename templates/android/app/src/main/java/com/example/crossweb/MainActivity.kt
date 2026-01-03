@@ -87,12 +87,12 @@ class MainActivity : AppCompatActivity() {
         // Add JS interface
         val ipc = Ipc(webView)
         ipc.setActivity(this)
-        webView.addJavascriptInterface(ipc, "__native__")
+        webView.addJavascriptInterface(ipc, "external")
 
         // Inject JS bridge for events
         webView.evaluateJavascript("""
-            window.__native__.listen = function(callback) {
-                window.__native__.onEvent = callback;
+            window.external.listen = function(callback) {
+                window.external.onEvent = callback;
             };
         """, null)
 

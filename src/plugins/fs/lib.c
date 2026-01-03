@@ -26,6 +26,7 @@
 
 // Plugin functions
 bool fs_init(PluginContext *ctx) {
+    (void)ctx;
     printf("FS plugin initialized on %s\n", PLATFORM);
     return true;
 }

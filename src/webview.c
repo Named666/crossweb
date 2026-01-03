@@ -17,10 +17,19 @@
 
 #include "hotreload.h"
 #include "plug.h"
+#include "ipc.h"
 
 #ifdef _WIN32
 
 static char g_start_url[MAX_PATH * 4];
+
+static bool host_eval_js(webview_t wv, const char *script) {
+    if (wv == NULL || script == NULL) {
+        return false;
+    }
+    struct webview *native = (struct webview *)wv;
+    return webview_eval(native, script) == 0;
+}
 
 static bool file_exists(const char *path) {
     DWORD attrs = GetFileAttributesA(path);
@@ -78,45 +87,6 @@ static void ensure_webview2_loader_path(void) {
     }
 }
 
-static bool append_url_char(char **cursor, size_t *remaining, unsigned char ch) {
-    if (*remaining <= 1) return false;
-    if (ch == '\\') {
-        **cursor = '/';
-        (*cursor)++;
-        (*remaining)--;
-        return true;
-    }
-    if (ch == ' ' || ch == '#' || ch == '%' || ch == '?') {
-        if (*remaining < 4) return false;
-        int written = snprintf(*cursor, *remaining, "%%%02X", ch);
-        if (written != 3) return false;
-        *cursor += 3;
-        *remaining -= 3;
-        return true;
-    }
-    **cursor = (char)ch;
-    (*cursor)++;
-    (*remaining)--;
-    return true;
-}
-
-static bool path_to_file_url(const char *path, char *out, size_t out_size) {
-    if (out_size < 10) return false;
-    strcpy(out, "file:///");
-    char *cursor = out + strlen(out);
-    size_t remaining = out_size - (size_t)(cursor - out);
-    for (const unsigned char *p = (const unsigned char *)path; *p; ++p) {
-        if (!append_url_char(&cursor, &remaining, *p)) {
-            return false;
-        }
-    }
-    if (remaining == 0) {
-        return false;
-    }
-    *cursor = '\0';
-    return true;
-}
-
 static bool resolve_start_url(void) {
     // Use Vite development server
     strcpy(g_start_url, "http://localhost:5173");
@@ -125,9 +95,14 @@ static bool resolve_start_url(void) {
 
 static void handle_external_invoke(struct webview *wv, const char *arg) {
     (void)wv;
-    if (!ipc_handle_js_message(arg)) {
+    if (!(*ipc_handle_js_message)(arg)) {
         fprintf(stderr, "IPC: dropped malformed message\n");
     }
+}
+
+static void on_webview_ready(struct webview *wv) {
+    (void)wv;
+    (*ipc_inject_bridge)();
 }
 
 static void configure_webview(struct webview *wv) {
@@ -139,6 +114,7 @@ static void configure_webview(struct webview *wv) {
     wv->resizable = 1;
     wv->debug = 1;
     wv->external_invoke_cb = handle_external_invoke;
+    wv->ready_cb = on_webview_ready;
 }
 
 int main(void) {
@@ -151,6 +127,12 @@ int main(void) {
     if (!reload_libplug()) {
         return 1;
     }
+
+#ifdef CROSSWEB_HOTRELOAD
+    if (plug_set_host_eval_js != NULL) {
+        plug_set_host_eval_js(host_eval_js);
+    }
+#endif
 
     struct webview wv;
     configure_webview(&wv);
@@ -169,6 +151,10 @@ int main(void) {
             if (!reload_libplug()) {
                 running = false;
                 break;
+            }
+
+            if (plug_set_host_eval_js != NULL) {
+                plug_set_host_eval_js(host_eval_js);
             }
             plug_post_reload(state);
         }

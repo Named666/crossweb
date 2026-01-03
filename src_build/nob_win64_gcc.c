@@ -29,6 +29,10 @@ bool build_dist(void)
     cmd_append(&cmd, "./src/plugins/keystore/src/plugin.c");
 #endif
     cmd_append(&cmd, "-lole32", "-loleaut32");
+#ifdef CROSSWEB_PLUGIN_KEYSTORE
+    cmd_append(&cmd, "-lcrypt32");
+    cmd_append(&cmd, "-lwebauthn");
+#endif
     if (!cmd_run(&cmd, .async = &procs)) return_defer(false);
 
     cmd_append(&cmd, "gcc");
@@ -43,6 +47,10 @@ bool build_dist(void)
         "./src/webview.c",
         "./src/hotreload_windows.c");
     cmd_append(&cmd, "-lole32", "-lcomctl32", "-loleaut32", "-luuid", "-lgdi32", "-ladvapi32");
+#ifdef CROSSWEB_PLUGIN_KEYSTORE
+    cmd_append(&cmd, "-lcrypt32");
+    cmd_append(&cmd, "-lwebauthn");
+#endif
     if (!cmd_run(&cmd, .async = &procs)) return_defer(false);
     if (!nob_procs_wait(procs)) return_defer(false);
 
@@ -79,6 +87,10 @@ bool build_dist(void)
     cmd_append(&cmd, "./src/plugins/keystore/src/plugin.c");
 #endif
     cmd_append(&cmd, "-lole32", "-lcomctl32", "-loleaut32", "-luuid", "-lgdi32", "-ladvapi32");
+#ifdef CROSSWEB_PLUGIN_KEYSTORE
+    cmd_append(&cmd, "-lcrypt32");
+    cmd_append(&cmd, "-lwebauthn");
+#endif
     if (!cmd_run(&cmd)) return_defer(false);
 
     // Ensure WebView2Loader.dll is available at runtime (otherwise WebView2 init

@@ -21,6 +21,12 @@ static int queue_tail = 0;
 static int queue_count = 0;
 static webview_t active_webview = NULL;
 
+static bool (*host_eval_js)(webview_t wv, const char *script) = NULL;
+
+void plug_set_host_eval_js(bool (*eval)(webview_t, const char *)) {
+    host_eval_js = eval;
+}
+
 static void ipc_queue_clear(void) {
     queue_head = 0;
     queue_tail = 0;
@@ -103,7 +109,15 @@ static bool base64_decode(const char *input, unsigned char *output, size_t outpu
 
 #ifdef _WIN32
 #ifdef CROSSWEB_BUILDING_PLUG
-static bool ipc_eval_js(const char *script) { (void)script; return false; }
+static bool ipc_eval_js(const char *script) {
+    if (script == NULL) {
+        return false;
+    }
+    if (host_eval_js == NULL) {
+        return false;
+    }
+    return host_eval_js(active_webview, script);
+}
 #else
 static bool ipc_eval_js(const char *script) {
     if (active_webview == NULL || script == NULL) {
@@ -118,7 +132,7 @@ static bool ipc_eval_js(const char *script) {
 }
 #endif
 
-static void ipc_inject_bridge(void) {
+void ipc_inject_bridge(void) {
     static const char *bridge_js =
         "(function(){"
         "var SEP=String.fromCharCode(30);"
@@ -134,19 +148,18 @@ static void ipc_inject_bridge(void) {
         "  return btoa(unescape(encodeURIComponent(text)));"
         "}"
         "function install(){"
-        "  if(window.__native__&&window.__native__.__bridgeInstalled){return;}"
-        "  window.__native__=window.__native__||{};"
-        "  window.__native__.__bridgeInstalled=true;"
-        "  window.__native__.invoke=function(cmd,payload){"
+        "  if(window.external&&window.external.__bridgeInstalled){return;}"
+        "  window.external=window.external||{};"
+        "  var nativeInvoke=window.external.invoke;"
+        "  window.external.__bridgeInstalled=true;"
+        "  window.external.invoke=function(cmd,payload){"
         "    var id=Math.random().toString(36).slice(2)+Date.now().toString(36);"
         "    var normalized=(payload===undefined||payload===null)?'':(typeof payload==='string'?payload:JSON.stringify(payload));"
         "    var encoded=encodePayload(normalized);"
-        "    if(window.external&&typeof window.external.invoke==='function'){"
-        "      window.external.invoke(id+SEP+String(cmd||'')+SEP+encoded);"
-        "    }"
+        "    if(typeof nativeInvoke==='function'){nativeInvoke(id+SEP+String(cmd||'')+SEP+encoded);}"
         "    return id;"
         "  };"
-        "  window.__native__.listen=function(cb){window.__native__.onEvent=cb;};"
+        "  window.external.listen=function(cb){window.external.onEvent=cb;};"
         "}"
         "if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',install);}"
         "else{install();}"
@@ -268,7 +281,7 @@ void ipc_send_response(const char *id, const char *response_json) {
         return;
     }
     static const char *tmpl =
-        "if(window.__native__&&window.__native__.onMessage){window.__native__.onMessage(\"%s\",JSON.parse(atob(\"%s\")));}";
+        "if(window.external&&window.external.onMessage){window.external.onMessage(\"%s\",JSON.parse(atob(\"%s\")));}";
     char *script = build_dispatch_script(tmpl, id, encoded);
     free(encoded);
     if (script != NULL) {
@@ -297,7 +310,7 @@ void ipc_emit_event(const char *event, const char *data_json) {
         return;
     }
     int needed = snprintf(NULL, 0,
-        "if(window.__native__&&window.__native__.onEvent){window.__native__.onEvent(\"%s\",JSON.parse(atob(\"%s\")));}",
+        "if(window.external&&window.external.onEvent){window.external.onEvent(\"%s\",JSON.parse(atob(\"%s\")));}",
         event, encoded);
     if (needed <= 0) {
         free(encoded);
@@ -309,7 +322,7 @@ void ipc_emit_event(const char *event, const char *data_json) {
         return;
     }
     snprintf(script, (size_t)needed + 1,
-        "if(window.__native__&&window.__native__.onEvent){window.__native__.onEvent(\"%s\",JSON.parse(atob(\"%s\")));}",
+        "if(window.external&&window.external.onEvent){window.external.onEvent(\"%s\",JSON.parse(atob(\"%s\")));}",
         event, encoded);
     free(encoded);
     ipc_eval_js(script);

@@ -27,6 +27,7 @@ void plug_register(Plugin *plugin) {
 
 
 bool plug_load(const char *path) {
+    (void)path;
     // TODO: Implement dynamic loading with dlopen/LoadLibrary
     fprintf(stderr, "Dynamic plugin loading not implemented yet\n");
     return false;
@@ -124,8 +125,11 @@ void plug_update(webview_t wv) {
 }
 
 void *plug_pre_reload(void) { return NULL; }  // Hotreload hooks
-void plug_post_reload(void *state) {}
+void plug_post_reload(void *state) {
+    (void)state;
+}
 void plug_cleanup(webview_t wv) {
+    (void)wv;
     // Cleanup all plugins
     for (int i = 0; i < plugin_count; ++i) {
         if (registered_plugins[i]->cleanup) {
@@ -137,11 +141,14 @@ void plug_cleanup(webview_t wv) {
 
 // Resource loading (keep minimal)
 void *plug_load_resource(const char *file_path, size_t *size) {
+    (void)file_path;
+    (void)size;
     // Stub for bundled resources
     return NULL;
 }
 
 void plug_free_resource(void *data) {
+    (void)data;
     // Stub
 }
 

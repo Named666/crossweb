@@ -16,7 +16,6 @@ typedef struct {
 
 void ipc_init(webview_t wv);
 bool ipc_receive(IpcMessage *msg);
-bool ipc_handle_js_message(const char *message);
 void ipc_send_response(const char *id, const char *response_json);
 void ipc_emit_event(const char *event, const char *data_json);
 void ipc_deinit(void);

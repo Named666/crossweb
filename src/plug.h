@@ -24,6 +24,7 @@ typedef struct Plugin {
 
 #define LIST_OF_PLUGS \
     PLUG(plug_init, void, webview_t) \
+    PLUG(plug_set_host_eval_js, void, bool (*)(webview_t, const char *)) \
     PLUG(plug_register, void, Plugin*) \
     PLUG(plug_load, bool, const char*) \
     PLUG(plug_pre_reload, void*, void) \
@@ -32,6 +33,7 @@ typedef struct Plugin {
     PLUG(plug_free_resource, void, void*) \
     PLUG(plug_update, void, webview_t) \
     PLUG(ipc_handle_js_message, bool, const char*) \
+    PLUG(ipc_inject_bridge, void, void) \
     PLUG(plug_cleanup, void, webview_t) \
     PLUG(plug_invoke, void, const char*, const char*, RespondCallback) \
     PLUG(plug_emit, void, const char*, const char*)
