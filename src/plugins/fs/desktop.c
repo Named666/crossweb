@@ -5,7 +5,6 @@
 #include <string.h>
 
 // Desktop-specific file operations (Win32, POSIX)
-
 FsError fs_read_file(const ReadFileRequest *req, char **content, size_t *size) {
     FILE *file = fopen(req->path, req->binary ? "rb" : "r");
     if (!file) {

@@ -14,7 +14,7 @@ static Feature_Flag feature_flags[] = {
         .macro = "CROSSWEB_HOTRELOAD",
         .name = "hotreload",
         .description = "Moves everything in src/plug.c to a separate \"DLL\" so it can be hotreloaded.",
-        .enabled_by_default = false,
+        .enabled_by_default = true,
     },
     {
         .macro = "CROSSWEB_UNBUNDLE",

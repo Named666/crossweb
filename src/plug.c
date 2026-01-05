@@ -1,8 +1,12 @@
+// ============================================================================
+// plug.c - Core plugin system
+// ============================================================================
+// Plugins are auto-registered at load time via PLUG_REGISTER() macro.
+// No manual includes or registration calls needed here.
+// See plug.h for the registration system documentation.
+// ============================================================================
+
 #include "plug.h"
-#include "ipc.h"
-#ifdef CROSSWEB_PLUGIN_KEYSTORE
-#include "plugins/keystore/src/plugin.h"
-#endif
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -10,16 +14,34 @@
 
 #ifdef ANDROID
 #include <jni.h>
+#include <stdbool.h>
+// android_emit is implemented in android_bridge.c to centralize JNI emission logic
+extern void android_emit(const char *event, const char *data);
 #endif
 
-// Plugin system
+// Plugin registry - populated by constructor functions before main()
 #define MAX_PLUGINS 100
 static Plugin *registered_plugins[MAX_PLUGINS];
 static int plugin_count = 0;
 
+static void (*host_emit_event)(const char *event, const char *data_json) = NULL;
+
 void plug_register(Plugin *plugin) {
+    if (plugin == NULL) {
+        fprintf(stderr, "plug_register: NULL plugin\n");
+        return;
+    }
     if (plugin_count < MAX_PLUGINS) {
+        // Check for duplicate registration (can happen with hotreload)
+        for (int i = 0; i < plugin_count; ++i) {
+            if (registered_plugins[i] == plugin ||
+                (registered_plugins[i]->name && plugin->name &&
+                 strcmp(registered_plugins[i]->name, plugin->name) == 0)) {
+                return; // Already registered
+            }
+        }
         registered_plugins[plugin_count++] = plugin;
+        printf("Plugin registered: %s (v%d)\n", plugin->name, plugin->version);
     } else {
         fprintf(stderr, "Maximum number of plugins reached\n");
     }
@@ -33,25 +55,28 @@ bool plug_load(const char *path) {
     return false;
 }
 
-static char pending_invoke_id[IPC_MAX_ID_LEN] = {0};
-
-static void respond_to_js(const char *response) {
-    if (pending_invoke_id[0] == '\0') {
-        return;
-    }
-    const char *payload = response ? response : "{\"ok\":true}";
-    ipc_send_response(pending_invoke_id, payload);
+CROSSWEB_API void plug_set_host_emit_event(void (*emit)(const char *event, const char *data_json)) {
+    host_emit_event = emit;
 }
 
-void plug_init(webview_t wv) {
-    ipc_init(wv);
-    // Register built-in plugins
-#ifdef CROSSWEB_PLUGIN_KEYSTORE
-    plug_register(&keystore_plugin);
+CROSSWEB_API void plug_init(webview_t wv) {
+    // Plugins are already registered via constructors (PLUG_REGISTER macro).
+    // We just need to initialize them here.
+
+    // Detect platform for context
+    const char *platform = "unknown";
+#ifdef _WIN32
+    platform = "windows";
+#elif defined(__APPLE__)
+    platform = "macos";
+#elif defined(__ANDROID__)
+    platform = "android";
+#elif defined(__linux__)
+    platform = "linux";
 #endif
 
     // Initialize all registered plugins
-    PluginContext ctx = { .webview = wv, .platform = "unknown", .config = "{}" };  // TODO: detect platform
+    PluginContext ctx = { .webview = wv, .platform = platform, .config = "{}" };
     for (int i = 0; i < plugin_count; ++i) {
         if (registered_plugins[i]->init) {
             registered_plugins[i]->init(&ctx);
@@ -59,7 +84,7 @@ void plug_init(webview_t wv) {
     }
 }
 
-void plug_invoke(const char *cmd, const char *payload, RespondCallback respond) {
+CROSSWEB_API void plug_invoke(const char *cmd, const char *payload, RespondCallback respond) {
     // Parse cmd, e.g., "fs.read" -> plugin "fs", subcmd "read"
     char *dot = strchr(cmd, '.');
     if (!dot) {
@@ -84,51 +109,27 @@ void plug_invoke(const char *cmd, const char *payload, RespondCallback respond) 
     if (respond) respond("{\"error\":\"unknown plugin\"}");
 }
 
-void plug_emit(const char *event, const char *data) {
+CROSSWEB_API void plug_emit(const char *event, const char *data) {
 #ifdef ANDROID
-    // Emit event to JS via JNI
-    // Assuming global_env and global_obj are set
-    extern JNIEnv *global_env;
-    extern jobject global_obj;
-    extern jmethodID emitMethodId;
-    if (global_env && global_obj && emitMethodId) {
-        jstring jevent = (*global_env)->NewStringUTF(global_env, event);
-        jstring jdata = (*global_env)->NewStringUTF(global_env, data);
-        (*global_env)->CallVoidMethod(global_env, global_obj, emitMethodId, jevent, jdata);
-        (*global_env)->DeleteLocalRef(global_env, jevent);
-        (*global_env)->DeleteLocalRef(global_env, jdata);
-    }
+    // Delegate Android emission to android_bridge.c helper
+    android_emit(event, data ? data : "null");
 #elif defined(_WIN32)
-    if (event) {
-        ipc_emit_event(event, data ? data : "null");
+    if (event && host_emit_event) {
+        host_emit_event(event, data ? data : "null");
     }
 #endif
 }
 
-void plug_update(webview_t wv) {
-    // Handle IPC messages
-    IpcMessage msg;
-    while (ipc_receive(&msg)) {
-        if (wv != NULL) {
-            char previous_id[IPC_MAX_ID_LEN];
-            memcpy(previous_id, pending_invoke_id, sizeof(previous_id));
-            strncpy(pending_invoke_id, msg.id, sizeof(pending_invoke_id) - 1);
-            pending_invoke_id[sizeof(pending_invoke_id) - 1] = '\0';
-            plug_invoke(msg.cmd, msg.payload, respond_to_js);
-            memcpy(pending_invoke_id, previous_id, sizeof(pending_invoke_id));
-        } else {
-            // No webview attached (e.g., Android JNI path)
-            plug_invoke(msg.cmd, msg.payload, NULL);
-        }
-    }
-    // TODO: Handle platform events and call plugin event handlers
+CROSSWEB_API void plug_update(webview_t wv) {
+    (void)wv;
+    // Intentionally minimal: the host owns IPC and calls plug_invoke directly.
 }
 
-void *plug_pre_reload(void) { return NULL; }  // Hotreload hooks
-void plug_post_reload(void *state) {
+CROSSWEB_API void *plug_pre_reload(void) { return NULL; }  // Hotreload hooks
+CROSSWEB_API void plug_post_reload(void *state) {
     (void)state;
 }
-void plug_cleanup(webview_t wv) {
+CROSSWEB_API void plug_cleanup(webview_t wv) {
     (void)wv;
     // Cleanup all plugins
     for (int i = 0; i < plugin_count; ++i) {
@@ -136,7 +137,6 @@ void plug_cleanup(webview_t wv) {
             registered_plugins[i]->cleanup();
         }
     }
-    ipc_deinit();
 }
 
 // Resource loading (keep minimal)

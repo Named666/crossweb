@@ -23,12 +23,34 @@
 
 static char g_start_url[MAX_PATH * 4];
 
-static bool host_eval_js(webview_t wv, const char *script) {
-    if (wv == NULL || script == NULL) {
-        return false;
+static char pending_invoke_id[IPC_MAX_ID_LEN] = {0};
+
+static void respond_to_js(const char *response) {
+    if (pending_invoke_id[0] == '\0') {
+        return;
     }
-    struct webview *native = (struct webview *)wv;
-    return webview_eval(native, script) == 0;
+    const char *payload = response ? response : "{\"ok\":true}";
+    ipc_response(pending_invoke_id, payload);
+}
+
+static void host_emit_event(const char *event, const char *data_json) {
+    if (event == NULL || event[0] == '\0') {
+        return;
+    }
+    ipc_emit_event(event, data_json ? data_json : "null");
+}
+
+static void process_ipc_queue(webview_t wv) {
+    IpcMessage msg;
+    while (ipc_receive(&msg)) {
+        char previous_id[IPC_MAX_ID_LEN];
+        memcpy(previous_id, pending_invoke_id, sizeof(previous_id));
+        strncpy(pending_invoke_id, msg.id, sizeof(pending_invoke_id) - 1);
+        pending_invoke_id[sizeof(pending_invoke_id) - 1] = '\0';
+        plug_invoke(msg.cmd, msg.payload, respond_to_js);
+        memcpy(pending_invoke_id, previous_id, sizeof(pending_invoke_id));
+    }
+    (void)wv;
 }
 
 static bool file_exists(const char *path) {
@@ -95,14 +117,14 @@ static bool resolve_start_url(void) {
 
 static void handle_external_invoke(struct webview *wv, const char *arg) {
     (void)wv;
-    if (!(*ipc_handle_js_message)(arg)) {
+    if (!ipc_handle_js_message(arg)) {
         fprintf(stderr, "IPC: dropped malformed message\n");
     }
 }
 
 static void on_webview_ready(struct webview *wv) {
     (void)wv;
-    (*ipc_inject_bridge)();
+    ipc_inject_bridge();
 }
 
 static void configure_webview(struct webview *wv) {
@@ -129,8 +151,8 @@ int main(void) {
     }
 
 #ifdef CROSSWEB_HOTRELOAD
-    if (plug_set_host_eval_js != NULL) {
-        plug_set_host_eval_js(host_eval_js);
+    if (plug_set_host_emit_event != NULL) {
+        plug_set_host_emit_event(host_emit_event);
     }
 #endif
 
@@ -141,6 +163,7 @@ int main(void) {
         return 1;
     }
 
+    ipc_init((webview_t)&wv);
     plug_init((webview_t)&wv);
 
     bool running = true;
@@ -148,21 +171,23 @@ int main(void) {
 #ifdef CROSSWEB_HOTRELOAD
         if (reload_libplug_changed()) {
             void *state = plug_pre_reload();
-            if (!reload_libplug()) {
-                running = false;
-                break;
+            if (reload_libplug()) {
+                printf("HOTRELOAD: successfully reloaded plugin\n");
+                if (plug_set_host_emit_event != NULL) {
+                    plug_set_host_emit_event(host_emit_event);
+                }
+                plug_init((webview_t)&wv);
+                plug_post_reload(state);
+            } else {
+                printf("HOTRELOAD: reload failed, keeping old version\n");
             }
-
-            if (plug_set_host_eval_js != NULL) {
-                plug_set_host_eval_js(host_eval_js);
-            }
-            plug_post_reload(state);
         }
 #endif
+        process_ipc_queue((webview_t)&wv);
         plug_update((webview_t)&wv);
     }
-
     plug_cleanup((webview_t)&wv);
+    ipc_deinit();
     webview_exit(&wv);
     return 0;
 }
@@ -176,7 +201,6 @@ int main(void)
     sigaction(SIGPIPE, &act, NULL);
 
     if (!reload_libplug()) return 1;
-
     plug_init((webview_t)NULL);
 
     for (;;) {
@@ -188,11 +212,9 @@ int main(void)
         }
 #endif
         plug_update((webview_t)NULL);
-        usleep(16 * 1000);
+        usleep(1000);
     }
-
     plug_cleanup((webview_t)NULL);
     return 0;
 }
-
 #endif

@@ -1,5 +1,10 @@
 #include <stdbool.h>
 
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#endif
+
 #define NOB_IMPLEMENTATION
 #define NOB_STRIP_PREFIX
 // #define NOB_WARN_DEPRECATED
@@ -41,6 +46,20 @@ int main(int argc, char **argv)
     nob_log(NOB_INFO, "--- STAGE 2 ---");
     // log_config(NOB_INFO);
     if (!build_dist()) return 1;
-    // TODO: it would be nice to check for situations like building TARGET_WIN64_MSVC on Linux and report that it's not possible.
+#ifdef CROSSWEB_HOTRELOAD
+#ifdef _WIN32
+    HWND hwnd = FindWindowA(NULL, "Crossweb");
+    if (hwnd != NULL) {
+        nob_log(NOB_INFO, "App already running, updated plugin DLL for hotreload");
+        return 0;
+    }
+#endif
+    {
+        Cmd run_cmd = {0};
+        cmd_append(&run_cmd, "./build/crossweb");
+        if (!cmd_run(&run_cmd)) return 1;
+    }
+#endif
+
     return 0;
 }

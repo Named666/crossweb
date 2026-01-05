@@ -12,6 +12,10 @@
 #endif
 #endif
 
+#ifdef __ANDROID__
+extern void android_response(const char *id, const char *response_json);
+#endif
+
 #define IPC_QUEUE_CAP 64
 #define IPC_SEPARATOR '\x1e'
 
@@ -20,12 +24,6 @@ static int queue_head = 0;
 static int queue_tail = 0;
 static int queue_count = 0;
 static webview_t active_webview = NULL;
-
-static bool (*host_eval_js)(webview_t wv, const char *script) = NULL;
-
-void plug_set_host_eval_js(bool (*eval)(webview_t, const char *)) {
-    host_eval_js = eval;
-}
 
 static void ipc_queue_clear(void) {
     queue_head = 0;
@@ -108,17 +106,6 @@ static bool base64_decode(const char *input, unsigned char *output, size_t outpu
 }
 
 #ifdef _WIN32
-#ifdef CROSSWEB_BUILDING_PLUG
-static bool ipc_eval_js(const char *script) {
-    if (script == NULL) {
-        return false;
-    }
-    if (host_eval_js == NULL) {
-        return false;
-    }
-    return host_eval_js(active_webview, script);
-}
-#else
 static bool ipc_eval_js(const char *script) {
     if (active_webview == NULL || script == NULL) {
         return false;
@@ -130,7 +117,6 @@ static bool ipc_eval_js(const char *script) {
     }
     return true;
 }
-#endif
 
 void ipc_inject_bridge(void) {
     static const char *bridge_js =
@@ -237,13 +223,13 @@ bool ipc_handle_js_message(const char *message) {
 
     if (!decode_payload_field(second + 1, msg.payload, sizeof(msg.payload))) {
         fprintf(stderr, "IPC: failed to decode payload for %s\n", msg.cmd);
-        ipc_send_response(msg.id, "{\"ok\":false,\"error\":\"invalid payload\"}");
+        ipc_response(msg.id, "{\"ok\":false,\"error\":\"invalid payload\"}");
         return false;
     }
 
     if (!ipc_queue_push(&msg)) {
         fprintf(stderr, "IPC: queue full, dropping %s\n", msg.id);
-        ipc_send_response(msg.id, "{\"ok\":false,\"error\":\"ipc queue full\"}");
+        ipc_response(msg.id, "{\"ok\":false,\"error\":\"ipc queue full\"}");
         return false;
     }
     return true;
@@ -265,11 +251,13 @@ static char *build_dispatch_script(const char *format, const char *id, const cha
     return buffer;
 }
 
-void ipc_send_response(const char *id, const char *response_json) {
+void ipc_response(const char *id, const char *response_json) {
     if (id == NULL || id[0] == '\0' || response_json == NULL) {
         return;
     }
-#ifdef _WIN32
+#ifdef __ANDROID__
+    android_response(id, response_json);
+#elif defined(_WIN32)
     size_t resp_len = strlen(response_json);
     size_t encoded_cap = ((resp_len + 2) / 3) * 4 + 4;
     char *encoded = (char *)malloc(encoded_cap);

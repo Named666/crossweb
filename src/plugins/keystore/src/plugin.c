@@ -58,6 +58,17 @@ static HWND webauthn_get_hwnd(void) {
     return GetForegroundWindow();
 }
 
+static void get_credential_id_path(char *path, size_t cap) {
+    const char *appdata = getenv("APPDATA");
+    if (appdata && appdata[0] != '\0') {
+        snprintf(path, cap, "%s\\crossweb", appdata);
+        CreateDirectoryA(path, NULL);
+        snprintf(path, cap, "%s\\crossweb\\webauthn_cred.bin", appdata);
+    } else {
+        snprintf(path, cap, ".\\webauthn_cred.bin");
+    }
+}
+
 static char *base64url_encode(const unsigned char *data, size_t len, size_t *out_len) {
     if (out_len) {
         *out_len = 0;
@@ -198,6 +209,15 @@ static bool create_credential(char *err, size_t err_cap) {
         return false;
     }
 
+    // Save credential ID to file
+    char path[MAX_PATH];
+    get_credential_id_path(path, sizeof(path));
+    FILE *f = fopen(path, "wb");
+    if (f) {
+        fwrite(attestation->pbCredentialId, 1, attestation->cbCredentialId, f);
+        fclose(f);
+    }
+
     WebAuthNFreeCredentialAttestation(attestation);
     return true;
 }
@@ -263,17 +283,53 @@ static bool windows_hello_prompt(const wchar_t *caption, const wchar_t *message,
     options.dwAuthenticatorAttachment = WEBAUTHN_AUTHENTICATOR_ATTACHMENT_PLATFORM;
     options.dwUserVerificationRequirement = WEBAUTHN_USER_VERIFICATION_REQUIREMENT_REQUIRED;
 
+    // Load credential ID if available
+    char path[MAX_PATH];
+    get_credential_id_path(path, sizeof(path));
+    BYTE cred_id[512];
+    size_t cred_id_len = 0;
+    FILE *f = fopen(path, "rb");
+    if (f) {
+        cred_id_len = fread(cred_id, 1, sizeof(cred_id), f);
+        fclose(f);
+    }
+
+    WEBAUTHN_CREDENTIAL cred = {0};
+    WEBAUTHN_CREDENTIALS creds = {0};
+    if (cred_id_len > 0) {
+        cred.dwVersion = WEBAUTHN_CREDENTIAL_CURRENT_VERSION;
+        cred.cbId = (DWORD)cred_id_len;
+        cred.pbId = cred_id;
+        cred.pwszCredentialType = WEBAUTHN_CREDENTIAL_TYPE_PUBLIC_KEY;
+
+        creds.cCredentials = 1;
+        creds.pCredentials = &cred;
+        options.CredentialList = creds;
+    }
+
     PWEBAUTHN_ASSERTION assertion = NULL;
     hr = WebAuthNAuthenticatorGetAssertion(webauthn_get_hwnd(), L"localhost", &client_data, &options, &assertion);
 
     if (FAILED(hr)) {
-        // If no credentials found, try to create one
+        // If no credentials found or assertion failed with specific error, try to create one
         // 0x80090011 = NTE_NOT_FOUND
-        // 0x80040001 = NotSupportedError (often returned when no credentials match)
-        if (hr == (HRESULT)0x80090011 || hr == (HRESULT)0x80040001) {
+        // 0x80040001 = NotSupportedError
+        if (hr == (HRESULT)0x80090011 || hr == (HRESULT)0x80040001 || hr == (HRESULT)0x80070490) { // 0x80070490 = ERROR_NOT_FOUND
              if (create_credential(err, err_cap)) {
-                 // Try again after creation
-                 hr = WebAuthNAuthenticatorGetAssertion(NULL, L"localhost", &client_data, &options, &assertion);
+                 // Try again after creation - reload the new ID
+                 f = fopen(path, "rb");
+                 if (f) {
+                     cred_id_len = fread(cred_id, 1, sizeof(cred_id), f);
+                     fclose(f);
+                 }
+                 if (cred_id_len > 0) {
+                     cred.cbId = (DWORD)cred_id_len;
+                     cred.pbId = cred_id;
+                     creds.cCredentials = 1;
+                     creds.pCredentials = &cred;
+                     options.CredentialList = creds;
+                 }
+                 hr = WebAuthNAuthenticatorGetAssertion(webauthn_get_hwnd(), L"localhost", &client_data, &options, &assertion);
              }
         }
     }
@@ -577,6 +633,7 @@ static void keystore_cleanup(void) {
     // Cleanup if needed
 }
 
+// Plugin definition
 Plugin keystore_plugin = {
     .name = "keystore",
     .version = 100,
@@ -585,6 +642,9 @@ Plugin keystore_plugin = {
     .event = keystore_event,
     .cleanup = keystore_cleanup
 };
+
+// Auto-register this plugin at load time
+PLUG_REGISTER(keystore_plugin)
 
 #ifdef __ANDROID__
 bool android_keystore_invoke(const char *cmd, const char *payload, RespondCallback respond) {

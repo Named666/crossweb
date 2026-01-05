@@ -20,6 +20,28 @@ __thread jstring current_jid;
 JNIEnv *global_env = NULL;
 jobject global_obj = NULL;
 
+// Helper: emit an event into the JS layer (centralized JNI emit)
+void android_emit(const char *event, const char *data) {
+    if (global_env == NULL || global_obj == NULL || emitMethodId == NULL) return;
+    const char *ev = event ? event : "";
+    const char *dt = data ? data : "null";
+    jstring jevent = (*global_env)->NewStringUTF(global_env, ev);
+    jstring jdata = (*global_env)->NewStringUTF(global_env, dt);
+    (*global_env)->CallVoidMethod(global_env, global_obj, emitMethodId, jevent, jdata);
+    (*global_env)->DeleteLocalRef(global_env, jevent);
+    (*global_env)->DeleteLocalRef(global_env, jdata);
+}
+
+// Helper: send response back to JS via JNI
+void android_response(const char *id, const char *response_json) {
+    if (global_env == NULL || global_obj == NULL || resolveInvokeMethodId == NULL) return;
+    jstring jid = (*global_env)->NewStringUTF(global_env, id);
+    jstring jresult = (*global_env)->NewStringUTF(global_env, response_json);
+    (*global_env)->CallVoidMethod(global_env, global_obj, resolveInvokeMethodId, jid, jresult);
+    (*global_env)->DeleteLocalRef(global_env, jid);
+    (*global_env)->DeleteLocalRef(global_env, jresult);
+}
+
 struct InvokeData {
     char *id;
     char *cmd;

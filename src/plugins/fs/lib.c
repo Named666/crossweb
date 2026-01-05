@@ -57,7 +57,7 @@ void fs_cleanup(void) {
     printf("FS plugin cleanup\n");
 }
 
-// Plugin struct
+// Plugin definition
 Plugin fs_plugin = {
     .name = "fs",
     .version = 100,
@@ -66,3 +66,6 @@ Plugin fs_plugin = {
     .event = fs_event,
     .cleanup = fs_cleanup
 };
+
+// Auto-register this plugin at load time
+PLUG_REGISTER(fs_plugin)
