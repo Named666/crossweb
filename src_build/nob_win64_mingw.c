@@ -8,7 +8,6 @@
 #else
 #define MAYBE_PREFIXED(x) "x86_64-w64-mingw32-"x
 #endif // _WIN32
-
 bool build_dist(void)
 {
     bool result = true;
@@ -28,7 +27,7 @@ bool build_dist(void)
 
 #ifdef CROSSWEB_HOTRELOAD
     cmd_append(&cmd, MAYBE_PREFIXED("gcc"));
-    cmd_append(&cmd, "-mwindows", "-Wall", "-Wextra", "-ggdb");
+    cmd_append(&cmd, "-Wall", "-Wextra", "-ggdb");
     cmd_append(&cmd, "-I.");
     cmd_append(&cmd, "-include", "build/config.h");
     cmd_append(&cmd, "-DCROSSWEB_BUILDING_PLUG=1");

@@ -30,8 +30,54 @@ export function invokeNative(cmd, payload) {
     try {
       installListener();
       console.log(`Invoking native command: ${cmd} with payload:`, payload);
-      const id = window.external.invoke(cmd, payload);
+      // If the host injected the bridge it will set __bridgeInstalled.
+      // Otherwise, some webviews expose a raw `external.invoke` that
+      // expects a single string payload. Compose the message to match
+      // the native format: id<SEP>cmd<SEP>base64(payload)
+      const SEP = String.fromCharCode(30);
+      function encodePayload(value) {
+        if (value === undefined || value === null) return '';
+        const text = (typeof value === 'string') ? value : JSON.stringify(value);
+        if (typeof TextEncoder !== 'undefined') {
+          const bytes = new TextEncoder().encode(text);
+          let bin = '';
+          for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+          return btoa(bin);
+        }
+        return btoa(unescape(encodeURIComponent(text)));
+      }
+
+      const id = Math.random().toString(36).slice(2) + Date.now().toString(36);
       pending[id] = { resolve, reject };
+
+      // If bridge installed, call native invoke as (cmd, payload) and expect it to return id.
+      if (window.external.__bridgeInstalled) {
+        try {
+          const ret = window.external.invoke(cmd, payload);
+          // Some bridges return the id directly
+          if (ret) {
+            // Use returned id if non-empty and pending not yet set for it
+            if (typeof ret === 'string' && ret.length && !pending[ret]) {
+              pending[ret] = pending[id];
+              delete pending[id];
+            }
+          }
+        } catch (e) {
+          // ignore and fall back to composed call below
+        }
+      } else {
+        // Compose single-string payload expected by native host
+        const normalized = (payload === undefined || payload === null) ? '' : (typeof payload === 'string' ? payload : JSON.stringify(payload));
+        const encoded = encodePayload(normalized);
+        try {
+          window.external.invoke(id + SEP + String(cmd || '') + SEP + encoded);
+        } catch (e) {
+          // if invoke throws, clean up pending and rethrow
+          delete pending[id];
+          throw e;
+        }
+      }
+
       // timeout to avoid forever-hanging promises
       setTimeout(() => {
         if (pending[id]) {

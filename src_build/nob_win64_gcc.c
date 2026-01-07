@@ -1,7 +1,6 @@
 #include "common.h"
 #include "plugins.h"
 
-
 bool build_dist(void)
 {
     bool result = true;

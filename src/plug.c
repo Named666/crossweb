@@ -85,6 +85,7 @@ CROSSWEB_API void plug_init(webview_t wv) {
 }
 
 CROSSWEB_API void plug_invoke(const char *cmd, const char *payload, RespondCallback respond) {
+    fprintf(stderr, "plug_invoke: cmd=%s payload=%s\n", cmd ? cmd : "NULL", payload ? payload : "NULL");
     // Parse cmd, e.g., "fs.read" -> plugin "fs", subcmd "read"
     char *dot = strchr(cmd, '.');
     if (!dot) {
