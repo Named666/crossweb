@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <direct.h>
+#include <stdio.h> // for sprintf
 
 // Moved from config.c
 const char *get_package_name(void) {
@@ -25,11 +26,11 @@ const char *get_package_name(void) {
 
 bool validate_android_init(void) {
     if (file_exists("android/app/build.gradle.kts") != 1) {
-        nob_log(ERROR, "Android project not initialized. Run 'nob android init' first.");
+        nob_log(NOB_ERROR, "Android project not initialized. Run 'nob android init' first.");
         return false;
     }
     if (file_exists("android/app/src/main/AndroidManifest.xml") != 1) {
-        nob_log(ERROR, "Android manifest missing. Re-run 'nob android init'.");
+        nob_log(NOB_ERROR, "Android manifest missing. Re-run 'nob android init'.");
         return false;
     }
     return true;
@@ -142,4 +143,58 @@ void slash_package_name(char *slashed, const char *package_name) {
     for (char *p = slashed; *p; ++p) {
         if (*p == '.') *p = '/';
     }
+}
+
+bool run_npm_command(const char *npm_cmd, bool background) {
+    Cmd cmd = {0};
+    cmd_append(&cmd, "cmd");
+    cmd_append(&cmd, "/c");
+    if (background) {
+        cmd_append(&cmd, "start");
+        cmd_append(&cmd, "cmd");
+        cmd_append(&cmd, "/c");
+    }
+    cmd_append(&cmd, "cd");
+    cmd_append(&cmd, "web");
+    cmd_append(&cmd, "&&");
+    cmd_append(&cmd, "npm");
+    // Split npm_cmd by spaces and add each part
+    char cmd_copy[1024];
+    strcpy(cmd_copy, npm_cmd);
+    char *token = strtok(cmd_copy, " ");
+    while (token) {
+        cmd_append(&cmd, token);
+        token = strtok(NULL, " ");
+    }
+    bool result = cmd_run(&cmd);
+    cmd_free(cmd);
+    return result;
+}
+
+bool run_android_emulator(const char *avd_name, int wait_seconds) {
+    const char *android_home = getenv("ANDROID_HOME");
+    if (!android_home) {
+        nob_log(NOB_ERROR, "ANDROID_HOME environment variable is not set");
+        return false;
+    }
+    char emulator_path[1024];
+    sprintf(emulator_path, "%s\\emulator\\emulator.exe", android_home);
+    Cmd cmd = {0};
+    cmd_append(&cmd, emulator_path);
+    cmd_append(&cmd, "-avd");
+    cmd_append(&cmd, avd_name);
+    cmd_append(&cmd, "-no-snapshot");
+    cmd_append(&cmd, "-gpu");
+    cmd_append(&cmd, "off");
+    if (!cmd_run_async(cmd)) return false; // Run in background
+    // Wait for emulator
+    cmd = (Cmd){0};
+    cmd_append(&cmd, "cmd");
+    cmd_append(&cmd, "/c");
+    cmd_append(&cmd, "timeout");
+    char timeout_str[16];
+    sprintf(timeout_str, "%d", wait_seconds);
+    cmd_append(&cmd, timeout_str);
+    cmd_run(&cmd);
+    return true;
 }

@@ -6,6 +6,8 @@
 #include <windows.h>
 
 #include "hotreload.h"
+#include "common.h"
+#include "plugins.h"
 
 // Hot-reload of libplug.dll implementation for Windows
 // 
@@ -87,56 +89,52 @@ static bool get_sources_latest_time(FILETIME *latest) {
 static bool rebuild_plugin_dll(void) {
     printf("HOTRELOAD: rebuilding plugin DLL...\n");
 
-    STARTUPINFOA si = { .cb = sizeof(si) };
-    PROCESS_INFORMATION pi = {0};
+    // Collect plugin source files automatically
+    Nob_File_Paths plugin_sources = {0};
+    if (!collect_plugin_sources(PLATFORM_DESKTOP, &plugin_sources)) {
+        nob_log(NOB_ERROR, "Failed to collect plugin sources");
+        return false;
+    }
+    
+    // Collect plugin library dependencies
+    Nob_File_Paths plugin_libs = {0};
+    collect_plugin_libs(&plugin_libs);
 
-    // Important: the DLL must already be unloaded before running the build,
-    // because Windows will lock a loaded DLL file.
-    //
-    // We call gcc directly instead of going through nob.exe, because nob.exe
-    // would try to rebuild nob_stage2.exe which may be locked by Windows.
-    //
-    // This command mirrors what nob_win64_gcc.c does for the hotreload DLL build.
-    // Plugin sources are hardcoded here for simplicity; if you add new plugins,
-    // add their .c files to this command line.
-
-    char cmdline[4096];
-    snprintf(cmdline, sizeof(cmdline),
-        "gcc -Wall -Wextra -ggdb "
-        "-I. "
-        "-include build/config.h "
-        "-DCROSSWEB_BUILDING_PLUG=1 "
-        "-DWEBVIEW_WINAPI "
-        "-fPIC -shared "
-        "-static-libgcc "
-        "-Wno-implicit-function-declaration "
-        "-o ./build/libplug.dll "
-        "./src/plug.c "
-        "./src/plugins/fs/lib.c "
-        "./src/plugins/fs/commands.c "
-        "./src/plugins/fs/error.c "
-        "./src/plugins/keystore/src/plugin.c "
-        "-lole32 -loleaut32 -lcrypt32 -lwebauthn"
-    );
-
-    printf("HOTRELOAD: %s\n", cmdline);
-
-    if (!CreateProcessA(NULL, cmdline, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi)) {
-        printf("HOTRELOAD: failed to start build: %lu\n", GetLastError());
+    Cmd cmd = {0};
+    cmd_append(&cmd, "gcc");
+    cmd_append(&cmd, "-Wall", "-Wextra", "-ggdb");
+    cmd_append(&cmd, "-I.");
+    cmd_append(&cmd, "-include", "build/config.h");
+    cmd_append(&cmd, "-DCROSSWEB_BUILDING_PLUG=1");
+    cmd_append(&cmd, "-DWEBVIEW_WINAPI");
+    cmd_append(&cmd, "-fPIC", "-shared");
+    cmd_append(&cmd, "-static-libgcc");
+    cmd_append(&cmd, "-Wno-implicit-function-declaration");
+    cmd_append(&cmd, "-o", "./build/libplug.dll");
+    cmd_append(&cmd, "./src/plug.c");
+    
+    // Add all discovered plugin sources
+    for (size_t i = 0; i < plugin_sources.count; ++i) {
+        cmd_append(&cmd, plugin_sources.items[i]);
+    }
+    
+    cmd_append(&cmd, "-lole32", "-loleaut32", "-lcrypt32", "-lwebauthn");
+    
+    // Add plugin-specific libraries
+    for (size_t i = 0; i < plugin_libs.count; ++i) {
+        cmd_append(&cmd, plugin_libs.items[i]);
+    }
+    
+    if (!cmd_run(&cmd)) {
+        nob_cmd_free(cmd);
+        nob_da_free(plugin_sources);
+        nob_da_free(plugin_libs);
         return false;
     }
 
-    WaitForSingleObject(pi.hProcess, INFINITE);
-
-    DWORD exit_code = 1;
-    GetExitCodeProcess(pi.hProcess, &exit_code);
-    CloseHandle(pi.hProcess);
-    CloseHandle(pi.hThread);
-
-    if (exit_code != 0) {
-        printf("HOTRELOAD: build failed with exit code %lu\n", exit_code);
-        return false;
-    }
+    nob_cmd_free(cmd);
+    nob_da_free(plugin_sources);
+    nob_da_free(plugin_libs);
 
     printf("HOTRELOAD: build successful\n");
     return true;
@@ -177,7 +175,7 @@ bool reload_libplug(void)
         FreeLibrary(libplug);
         libplug = NULL;
         // Give the OS a moment to drop file locks in edge cases.
-        Sleep(10);
+        Sleep(1);
     }
 
     if (rebuild_requested) {

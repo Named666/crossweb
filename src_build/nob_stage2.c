@@ -25,10 +25,6 @@
 #include "nob_linux.c"
 #elif defined(CROSSWEB_TARGET_MACOS)
 #include "nob_macos.c"
-#elif defined(CROSSWEB_TARGET_WIN64_MINGW)
-#include "nob_win64_mingw.c"
-#elif defined(CROSSWEB_TARGET_WIN64_MSVC)
-#include "nob_win64_msvc.c"
 #elif defined(CROSSWEB_TARGET_WIN64_GCC)
 #include "nob_win64_gcc.c"
 #elif defined(CROSSWEB_TARGET_OPENBSD)

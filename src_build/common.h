@@ -20,4 +20,8 @@ const char *get_package_name(void);
 bool is_plugin_enabled(const char *plugin_name);
 bool validate_android_init(void);
 
+// Command helpers
+bool run_npm_command(const char *npm_cmd, bool background);
+bool run_android_emulator(const char *avd_name, int wait_seconds);
+
 #endif // COMMON_H_

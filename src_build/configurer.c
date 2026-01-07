@@ -37,16 +37,6 @@ static Target_Flag target_flags[] = {
         .enabled_by_default = true,
     },
     {
-        .macro = "CROSSWEB_TARGET_WIN64_MSVC",
-        .name = "win64-msvc",
-        .enabled_by_default = false,
-    },
-    {
-        .macro = "CROSSWEB_TARGET_WIN64_MINGW",
-        .name = "win64-mingw",
-        .enabled_by_default = false,
-    },
-    {
         .macro = "CROSSWEB_TARGET_LINUX",
         .name = "linux",
         .enabled_by_default = false,

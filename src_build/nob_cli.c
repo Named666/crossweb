@@ -36,7 +36,7 @@ int nob_cli_main(int argc, char **argv)
                     }
                 }
                 if (!found) {
-                    nob_log(ERROR, "Unknown command `%s`", flag_name);
+                    nob_log(NOB_ERROR, "Unknown command `%s`", flag_name);
                     return 1;
                 }
             }
@@ -44,17 +44,7 @@ int nob_cli_main(int argc, char **argv)
             return 0;
         } else if (strcmp(command_name, "init") == 0) {
             if (!mkdir_if_not_exists("web")) return 1;
-            Cmd cmd = {0};
-            cmd_append(&cmd, "cmd");
-            cmd_append(&cmd, "/c");
-            cmd_append(&cmd, "cd");
-            cmd_append(&cmd, "web");
-            cmd_append(&cmd, "&&");
-            cmd_append(&cmd, "npm");
-            cmd_append(&cmd, "create");
-            cmd_append(&cmd, "vite@latest");
-            cmd_append(&cmd, ".");
-            if (!cmd_run(&cmd)) return 1;
+            if (!run_npm_command("create vite@latest .", false)) return 1;
             return 0;
         } else if (strcmp(command_name, "dev") == 0) {
             int web_exists = file_exists("web");
@@ -64,19 +54,7 @@ int nob_cli_main(int argc, char **argv)
                 return 1;
             }
             // Start Vite dev server in background (Windows)
-            Cmd cmd = {0};
-            cmd_append(&cmd, "cmd");
-            cmd_append(&cmd, "/c");
-            cmd_append(&cmd, "start");
-            cmd_append(&cmd, "cmd");
-            cmd_append(&cmd, "/c");
-            cmd_append(&cmd, "cd");
-            cmd_append(&cmd, "web");
-            cmd_append(&cmd, "&&");
-            cmd_append(&cmd, "npm");
-            cmd_append(&cmd, "run");
-            cmd_append(&cmd, "dev");
-            if (!cmd_run(&cmd)) return 1;
+            if (!run_npm_command("run dev", true)) return 1;
             nob_log(NOB_INFO, "Vite dev server started");
             return 0;
         } else if (strcmp(command_name, "build") == 0) {
@@ -87,21 +65,12 @@ int nob_cli_main(int argc, char **argv)
                 return 1;
             }
             // Run Vite build
-            Cmd cmd = {0};
-            cmd_append(&cmd, "cmd");
-            cmd_append(&cmd, "/c");
-            cmd_append(&cmd, "cd");
-            cmd_append(&cmd, "web");
-            cmd_append(&cmd, "&&");
-            cmd_append(&cmd, "npm");
-            cmd_append(&cmd, "run");
-            cmd_append(&cmd, "build");
-            if (!cmd_run(&cmd)) return 1;
+            if (!run_npm_command("run build", false)) return 1;
             nob_log(NOB_INFO, "Web build finished");
             return 0;
         } else if (strcmp(command_name, "android") == 0) {
             if (argc == 0) {
-                nob_log(ERROR, "android command requires a subcommand");
+                nob_log(NOB_ERROR, "android command requires a subcommand");
                 return 1;
             }
             const char *subcommand = shift_args(&argc, &argv);
@@ -115,20 +84,20 @@ int nob_cli_main(int argc, char **argv)
                     if (strcmp(arg, "--package") == 0 || strcmp(arg, "-p") == 0) {
                         shift_args(&argc, &argv);
                         if (argc == 0) {
-                            nob_log(ERROR, "Expected package name after --package");
+                            nob_log(NOB_ERROR, "Expected package name after --package");
                             return 1;
                         }
                         package_name = shift_args(&argc, &argv);
                     } else if (strcmp(arg, "--app-name") == 0 || strcmp(arg, "-n") == 0) {
                         shift_args(&argc, &argv);
                         if (argc == 0) {
-                            nob_log(ERROR, "Expected app name after --app-name");
+                            nob_log(NOB_ERROR, "Expected app name after --app-name");
                             return 1;
                         }
                         app_name = shift_args(&argc, &argv);
                     } else {
-                        nob_log(ERROR, "Unknown argument: %s", arg);
-                        nob_log(ERROR, "Usage: nob android init [--package <package>] [--app-name <name>]");
+                        nob_log(NOB_ERROR, "Unknown argument: %s", arg);
+                        nob_log(NOB_ERROR, "Usage: nob android init [--package <package>] [--app-name <name>]");
                         return 1;
                     }
                 }
@@ -140,13 +109,13 @@ int nob_cli_main(int argc, char **argv)
                 int build_gradle_exists = file_exists("android/app/build.gradle.kts");
                 if (build_gradle_exists < 0) return 1;
                 if (build_gradle_exists == 1) {
-                    nob_log(ERROR, "Android project already exists in ./android/");
+                    nob_log(NOB_ERROR, "Android project already exists in ./android/");
                     return 1;
                 }
 
                 // Copy template with replacements
                 if (!copy_template_with_replacements("templates/android", "android", package_name, app_name)) {
-                    nob_log(ERROR, "Failed to copy Android template");
+                    nob_log(NOB_ERROR, "Failed to copy Android template");
                     return 1;
                 }
 
@@ -156,7 +125,7 @@ int nob_cli_main(int argc, char **argv)
                 if (!validate_android_init()) return 1;
                 const char *package_name = get_package_name();
                 if (!package_name) {
-                    nob_log(ERROR, "Could not determine package name from AndroidManifest.xml");
+                    nob_log(NOB_ERROR, "Could not determine package name from AndroidManifest.xml");
                     return 1;
                 }
                 // Convert package to path
@@ -169,23 +138,11 @@ int nob_cli_main(int argc, char **argv)
                 sprintf(main_activity_path, "android/app/src/main/java/%s/MainActivity.kt", package_path);
 
                 // Start Vite dev server in background
-                Cmd cmd = {0};
-                cmd_append(&cmd, "cmd");
-                cmd_append(&cmd, "/c");
-                cmd_append(&cmd, "start");
-                cmd_append(&cmd, "cmd");
-                cmd_append(&cmd, "/c");
-                cmd_append(&cmd, "cd");
-                cmd_append(&cmd, "web");
-                cmd_append(&cmd, "&&");
-                cmd_append(&cmd, "npm");
-                cmd_append(&cmd, "run");
-                cmd_append(&cmd, "dev");
-                if (!cmd_run(&cmd)) return 1;
+                if (!run_npm_command("run dev", true)) return 1;
                 // Modify MainActivity for dev
                 if (!replace_all_in_file(main_activity_path, "webView.loadUrl(\"https://appassets.androidplatform.net/index.html\")", "webView.loadUrl(\"http://localhost:5173\")")) return 1;
                 // Build debug APK
-                cmd = (Cmd){0};
+                Cmd cmd = {0};
                 cmd_append(&cmd, "cmd");
                 cmd_append(&cmd, "/c");
                 cmd_append(&cmd, "cd");
@@ -194,26 +151,8 @@ int nob_cli_main(int argc, char **argv)
                 cmd_append(&cmd, "gradle");
                 cmd_append(&cmd, "assembleDebug");
                 if (!cmd_run(&cmd)) return 1;
-                // Launch emulator (assume AVD exists)
-                cmd = (Cmd){0};
-                const char *android_home = getenv("ANDROID_HOME");
-                if (!android_home) {
-                    nob_log(ERROR, "ANDROID_HOME environment variable is not set");
-                    return 1;
-                }
-                char emulator_path[1024];
-                sprintf(emulator_path, "%s\\emulator\\emulator.exe", android_home);
-                cmd_append(&cmd, emulator_path);
-                cmd_append(&cmd, "-avd");
-                cmd_append(&cmd, "Medium_Phone_API_36");
-                if (!cmd_run(&cmd)) return 1; // run in background? but sync
-                // Wait for emulator
-                cmd = (Cmd){0};
-                cmd_append(&cmd, "cmd");
-                cmd_append(&cmd, "/c");
-                cmd_append(&cmd, "timeout");
-                cmd_append(&cmd, "10");
-                cmd_run(&cmd);
+                // Launch emulator
+                if (!run_android_emulator("Medium_Phone_API_36", 10)) return 1;
                 // Install and run
                 cmd = (Cmd){0};
                 cmd_append(&cmd, "adb");
@@ -249,34 +188,13 @@ int nob_cli_main(int argc, char **argv)
                 if (!validate_android_init()) return 1;
                 const char *package_name = get_package_name();
                 if (!package_name) {
-                    nob_log(ERROR, "Could not determine package name from AndroidManifest.xml");
+                    nob_log(NOB_ERROR, "Could not determine package name from AndroidManifest.xml");
                     return 1;
                 }
-                // Launch emulator if not running
-                Cmd cmd = {0};
-                const char *android_home = getenv("ANDROID_HOME");
-                if (!android_home) {
-                    nob_log(ERROR, "ANDROID_HOME environment variable is not set");
-                    return 1;
-                }
-                char emulator_path[1024];
-                sprintf(emulator_path, "%s\\emulator\\emulator.exe", android_home);
-                cmd_append(&cmd, emulator_path);
-                cmd_append(&cmd, "-avd");
-                cmd_append(&cmd, "Medium_Phone_API_36");
-                cmd_append(&cmd, "-no-snapshot");
-                cmd_append(&cmd, "-gpu");
-                cmd_append(&cmd, "off");
-                if (!cmd_run(&cmd)) return 1;
-                // Wait for emulator
-                cmd = (Cmd){0};
-                cmd_append(&cmd, "cmd");
-                cmd_append(&cmd, "/c");
-                cmd_append(&cmd, "timeout");
-                cmd_append(&cmd, "30");
-                cmd_run(&cmd);
+                // Launch emulator
+                if (!run_android_emulator("Medium_Phone_API_36", 30)) return 1;
                 // Install and run release APK
-                cmd = (Cmd){0};
+                Cmd cmd = {0};
                 cmd_append(&cmd, "adb");
                 cmd_append(&cmd, "install");
                 cmd_append(&cmd, "-r");
@@ -304,7 +222,7 @@ int nob_cli_main(int argc, char **argv)
                 nob_log(INFO, "APK installed");
                 return 0;
             } else {
-                nob_log(ERROR, "Unknown android subcommand `%s`", subcommand);
+                nob_log(NOB_ERROR, "Unknown android subcommand `%s`", subcommand);
                 return 1;
             }
         } else if (strcmp(command_name, "help") == 0) {
@@ -318,7 +236,7 @@ int nob_cli_main(int argc, char **argv)
             nob_log(INFO, "    help");
             return 0;
         } else {
-            nob_log(ERROR, "Unknown command `%s`", command_name);
+            nob_log(NOB_ERROR, "Unknown command `%s`", command_name);
             return 1;
         }
     }
