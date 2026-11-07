@@ -5,9 +5,16 @@ on:
   pull_request:
 
 jobs:
-  linux-core:
+  linux-webkit:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Bootstrap, test, and link the Linux runtime
+      - name: Install distro WebKitGTK and a virtual display
+        run: |
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+            -o Dpkg::Options::=--force-confdef \
+            -o Dpkg::Options::=--force-confold \
+            pkg-config libgtk-3-dev libwebkit2gtk-4.1-dev xvfb
+      - name: Test the core and the Linux system WebView
         run: bash scripts/check.sh

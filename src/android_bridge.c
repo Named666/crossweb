@@ -6,6 +6,7 @@
 #include <stdbool.h>
 #include <pthread.h>
 #include "plug.h"
+#include "plugins/fs/path.h"
 
 // Cache method ids
 static jmethodID resolveInvokeMethodId;
@@ -156,6 +157,18 @@ JNIEXPORT void JNICALL Java___PACKAGE_MANGLED___Ipc_nativeInvoke(JNIEnv *env, jo
     (*env)->ReleaseStringUTFChars(env, jid, id);
     (*env)->ReleaseStringUTFChars(env, jcmd, cmd);
     (*env)->ReleaseStringUTFChars(env, jpayload, payload);
+}
+
+JNIEXPORT void JNICALL Java___PACKAGE_MANGLED___Ipc_nativeSetAppDataRoot(JNIEnv *env, jobject obj, jstring jpath) {
+    const char *path;
+    (void)obj;
+    if (jpath == NULL) return;
+    path = (*env)->GetStringUTFChars(env, jpath, 0);
+    if (path == NULL) return;
+    if (!fs_set_root(path)) {
+        __android_log_print(ANDROID_LOG_ERROR, "{{APP_NAME}}", "rejected app data root");
+    }
+    (*env)->ReleaseStringUTFChars(env, jpath, path);
 }
 
 JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {

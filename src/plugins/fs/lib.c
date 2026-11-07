@@ -2,31 +2,33 @@
 #include "models.h"
 #include "error.h"
 #include "commands.h"
+#include "path.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-// Platform detection
 #ifdef _WIN32
 #define PLATFORM "windows"
-#include "desktop.c"
 #elif defined(__APPLE__)
 #define PLATFORM "macos"
-#include "desktop.c"  // For now, use desktop on macOS
 #elif defined(__ANDROID__)
 #define PLATFORM "android"
-#include "mobile.c"
 #elif defined(__linux__)
 #define PLATFORM "linux"
-#include "desktop.c"
 #else
 #define PLATFORM "unknown"
-#include "desktop.c"
 #endif
 
-// Plugin functions
+int fs_commands_entered = 0;
+
 bool fs_init(PluginContext *ctx) {
     (void)ctx;
+#ifndef __ANDROID__
+    if (!fs_ensure_user_root()) {
+        fprintf(stderr, "FS plugin: app data directory is unavailable; fs commands fail closed\n");
+    }
+#endif
     printf("FS plugin initialized on %s\n", PLATFORM);
     return true;
 }
@@ -34,12 +36,15 @@ bool fs_init(PluginContext *ctx) {
 bool fs_invoke(const char *command, const char *payload, RespondCallback respond) {
     char *response = NULL;
     bool success = false;
-    if (strcmp(command, "read") == 0) {
+    fs_commands_entered++;
+    if (command == NULL) {
+        response = strdup("{\"ok\":false,\"error\":\"invalid command\"}");
+    } else if (strcmp(command, "read") == 0) {
         success = fs_read_command(payload, &response);
     } else if (strcmp(command, "write") == 0) {
         success = fs_write_command(payload, &response);
     } else {
-        response = strdup("{\"error\":\"unknown command\"}");
+        response = strdup("{\"ok\":false,\"error\":\"unknown command\"}");
     }
     if (respond && response) {
         respond(response);
@@ -49,15 +54,14 @@ bool fs_invoke(const char *command, const char *payload, RespondCallback respond
 }
 
 void fs_event(const char *event, const char *data) {
-    // Handle file system events
-    printf("FS event: %s %s\n", event, data);
+    (void)event;
+    (void)data;
 }
 
 void fs_cleanup(void) {
     printf("FS plugin cleanup\n");
 }
 
-// Plugin definition
 Plugin fs_plugin = {
     .name = "fs",
     .version = 100,
@@ -67,5 +71,4 @@ Plugin fs_plugin = {
     .cleanup = fs_cleanup
 };
 
-// Auto-register this plugin at load time
 PLUG_REGISTER(fs_plugin)

@@ -76,8 +76,6 @@ static void select_host_target_if_needed(void)
     if (target_overridden) return;
 #if defined(_WIN32)
     const char *host = "win64-gcc";
-#elif defined(__APPLE__)
-    const char *host = "macos";
 #elif defined(__linux__)
     const char *host = "linux";
 #else
@@ -95,6 +93,10 @@ bool config_set_target(const char *name)
 {
     if (name == NULL || name[0] == '\0') {
         nob_log(NOB_ERROR, "Expected a target name");
+        return false;
+    }
+    if (strcmp(name, "macos") == 0 || strcmp(name, "ios") == 0 || strcmp(name, "openbsd") == 0) {
+        nob_log(NOB_ERROR, "Target `%s` is deferred. Use linux, win64-gcc, or android.", name);
         return false;
     }
     bool found = false;

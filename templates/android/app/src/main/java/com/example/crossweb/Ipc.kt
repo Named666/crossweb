@@ -21,13 +21,18 @@ class Ipc(val webView: WebView) {
         fun getActivity(): AppCompatActivity {
             return activity!!
         }
+    // The WebView URL is the main frame only. Navigation policy in MainActivity
+    // is what keeps untrusted documents out. This check is not frame isolation.
     private fun pageIsTrusted(): Boolean {
         val url = webView.url ?: return false
-        return url.startsWith("https://appassets.androidplatform.net/") ||
-            url.startsWith("http://localhost:") ||
-            url.startsWith("http://127.0.0.1:") ||
-            url.startsWith("https://localhost:") ||
-            url.startsWith("https://127.0.0.1:")
+        if (url == "https://appassets.androidplatform.net" ||
+            url.startsWith("https://appassets.androidplatform.net/")) {
+            return true
+        }
+        val match = Regex("^(https?)://(localhost|127\\.0\\.0\\.1):([0-9]{1,5})(/.*)?$").matchEntire(url)
+            ?: return false
+        val port = match.groupValues[3].toIntOrNull() ?: return false
+        return port in 1..65535
     }
 
     private fun identifierOk(value: String): Boolean {
@@ -99,6 +104,11 @@ class Ipc(val webView: WebView) {
         public fun getStaticActivity(): AppCompatActivity? = staticActivity
     }
 
+    fun setAppDataRoot(path: String) {
+        nativeSetAppDataRoot(path)
+    }
+
     private external fun ipc(url: String, message: String)
     private external fun nativeInvoke(id: String, cmd: String, payload: String)
+    private external fun nativeSetAppDataRoot(path: String)
 }

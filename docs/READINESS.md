@@ -1,126 +1,125 @@
 # Crossweb readiness
 
-This repository is **not production-ready**. The notes below are the milestone-1 baseline: a deny-by-default native command gate, a POSIX `nob` bootstrap, and a Linux test/link check. They do not make the framework a viable Tauri, React Native, or Electron replacement.
+This repository is **not production-ready**. Milestone 2 adds a Linux system-WebView shell and the shared trust rules that Windows and Android hosts are written to follow. It does not make those other hosts verified.
+
+The browser engine is the platform's own WebView:
+
+| Target | WebView | Engine packaging |
+| --- | --- | --- |
+| Linux | WebKitGTK 4.1 (`webkit2gtk-4.1`), falling back to 4.0 | Distro packages. There is no single universal Linux WebView; WebKitGTK is the native GTK backend. |
+| Windows | Microsoft Edge WebView2 | Installed Evergreen runtime. The SDK supplies headers and `WebView2LoaderStatic` only. No Fixed Version runtime is vendored. |
+| Android | `android.webkit.WebView` | The device's system WebView. |
+
+No Chromium, CEF, or Electron binary is linked or downloaded.
 
 ## Matrix
 
-| Area | State | What the tree actually contains |
+| Area | State | Evidence |
 | --- | --- | --- |
-| IPC framing and `plugin.command` grants | **Supported** for the cases in `tests/test_core.c` | `plug_invoke` denies every command unless `crossweb.permissions` or `plug_grant` lists that exact pair. The committed grant file lists nothing. |
-| Linux native binary | **Incomplete** | `./build/crossweb` links and stays running. It registers `fs` and `keystore`, then loops. It does not open a WebView. `ldd` shows `libc` and `libm` only. |
-| Windows host | **Incomplete** | `src/webview.c` has a WebView2 loop, hardcoded to `http://localhost:5173`. `thirdparty/webview-c` is not in the repo. Remote debugging is compiled off unless `CROSSWEB_WEBVIEW_DEBUG` is 1. |
-| macOS host | **Incomplete** | `src_build/nob_macos.c` passes `-framework Cocoa -framework WebKit`. The non-Windows `main` in `src/webview.c` does not call those frameworks. |
-| Android | **Incomplete** | Kotlin/C templates and a JNI bridge exist. `nob android` shells out through `cmd.exe` and `xcopy`. Release signing uses the debug keystore. |
-| iOS | **Incomplete** | `src_build/nob_ios.c` is empty. |
-| OpenBSD | **Incomplete** | `src_build/nob_openbsd.c` still packages Musializer paths (`./build/musializer`, `./resources/`). |
-| Web frontend and dev loop | **Incomplete** | No `web/` app is checked in. `nob init`, `nob dev`, and `nob build` call `npm` through `cmd.exe`. |
-| Extra `<webview>` instances | **Incomplete** | No implementation. |
-| Packaging and auto-update | **Incomplete** | No installer, notarization, or store packaging. |
-| Plugins named only in `PLUGIN_SPEC.md` | **Incomplete** | `dialog`, `clipboard`, `http`, `notifications`, `geolocation`, `biometrics`, and `secure_storage` have no sources. `plug_load` still returns false. |
-| macOS, iOS, Windows, and Android **runtimes** | **Unverified** | No build or launch command for those targets was run for this milestone. Status above is from reading the sources. |
+| Command grants | **Supported** | `plug_invoke` still denies exact `plugin.command` pairs that are not listed. `crossweb.permissions` grants only `app.ping`. |
+| Origin policy | **Supported** as a pure function | `tests/test_bounds.c`. Trusted origins are `crossweb://app`, the Windows virtual host `https://crossweb.localhost`, the Android asset host, and an explicit localhost dev origin. |
+| Bundled asset paths | **Supported** | Traversal, `%2e%2e`, unknown suffixes, and symlinks are rejected. |
+| `fs` app-data jail | **Supported** on Linux | Reads and writes use `openat` with `O_NOFOLLOW` under the root from `fs_set_root`. Absolute paths and `..` fail. Symlinks fail. |
+| Linux WebKitGTK shell | **Verified runtime** under Xvfb | `bash scripts/check.sh` launched `./build/crossweb --smoke`. The page showed the ping result and the denied `fs.read`. `fs_commands_entered` stayed 0 and `app_ping_entered` was 1. |
+| Linux dev URL rejection | **Verified** | `CROSSWEB_DEV_URL=http://evil.test:5173 ./build/crossweb --smoke` exited 1 before loading a page. |
+| Windows WebView2 host | **Unverified** | `src/win/host.cpp` is the C++ adapter over the C99 core. This environment has no MinGW g++, no WebView2 headers, and no Evergreen runtime. The file was not compiled. |
+| Android `android.webkit.WebView` template | **Unverified** | Template and JNI were edited. This environment has no Android SDK, `sdkmanager`, or Gradle. Nothing was compiled, installed, or launched. |
+| macOS, iOS, OpenBSD | **Deferred** | `nob config target` rejects them. Their build files return an error. |
+| Extra `<webview>` instances, installers, signing | **Incomplete** | Not in this milestone. |
 
-"Supported" means the portable tests pass. It does not mean a platform app is shippable.
+## What the Linux shell does
+
+Production content is `assets/index.html`, `assets/app.css`, and `assets/app.js`, served as `crossweb://app/` from the UI process. The page is not `http://localhost:5173`.
+
+`CROSSWEB_DEV_URL` is optional and must be `http` or `https` to `localhost` or `127.0.0.1` with a port. Remote debugging is off unless `CROSSWEB_WEBVIEW_DEBUG=1` or the compile-time flag is set.
+
+Navigation and subresource responses whose origin is not the app origin or that dev origin are ignored. The bridge script is injected into the top frame only. WebKit's sandbox is enabled. A GLib warning while releasing the sandboxed web-process name was printed on shutdown; the smoke process still exited 0.
+
+`app.ping` echoes a short nonce. `fs.read` is not granted, so `fs_invoke` is not entered. If it is granted later, `fs_read_file` still refuses paths outside the app data directory (`$XDG_DATA_HOME/crossweb` or `~/.local/share/crossweb`).
 
 ## Commands
 
-From a POSIX checkout, compiler `cc` (this run used Ubuntu clang 18.1.3):
+Linux packages used here (Ubuntu 24.04, WebKitGTK 2.52.6):
 
 ```sh
+sudo apt-get update
+sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+  -o Dpkg::Options::=--force-confdef \
+  -o Dpkg::Options::=--force-confold \
+  pkg-config libgtk-3-dev libwebkit2gtk-4.1-dev xvfb
 bash scripts/check.sh
 ```
 
-That script:
+`scripts/check.sh` compiles `test_core`, `test_bounds`, and `test_fs` with `-std=c99 -Wall -Wextra -Werror`, bootstraps `nob`, links `./build/crossweb` to `libwebkit2gtk-4.1`, and runs:
 
-1. Compiles and runs `tests/test_core.c` with `-std=c99 -Wall -Wextra -Werror`.
-2. Bootstraps `nob` with `cc -Wall -Wextra -Werror -o nob nob.c`.
-3. Checks `nob help`, rejects `nob config target nosuch`, and checks `nob config target win64-gcc` then `nob config target linux`.
-4. Runs `./nob`, which links `./build/crossweb` with `-Wall -Wextra -Werror`.
-5. Rejects the binary if `ldd` shows WebKit or GTK.
-6. Starts `./build/crossweb` under `timeout 0.5`. The process must still be running (exit 124), print plugin init on stdout, and write no stderr.
+```sh
+GDK_BACKEND=x11 WEBKIT_DISABLE_COMPOSITING_MODE=1 LIBGL_ALWAYS_SOFTWARE=1 \
+  xvfb-run -a -s '-screen 0 1280x800x24' ./build/crossweb --smoke
+```
 
-`nob config` rewrites `build/config.h` from defaults plus the flags on that command. It does not merge with the previous file. A missing config enables the OS that compiled `nob`. Hot reload and WebView remote debugging are numeric `0` unless named: the sources test them with `#if`, not `#ifdef`.
+Manual run from the repo root, with a display: `./build/crossweb`.
 
-Do not treat `./build/crossweb` as an app. Without `timeout` it loops.
+Windows, when a toolchain exists:
 
-These commands were **not** run:
+```sh
+# Headers and loader from the NuGet package Microsoft.Web.WebView2, build/native.
+# Do not download the Fixed Version browser.
+export WEBVIEW2_INCLUDE=/path/to/build/native/include
+export WEBVIEW2_LIB=/path/to/build/native/x64
+./nob config target win64-gcc
+./nob
+```
 
-- `nob init`, `nob dev`, `nob build`
-- `nob android init|dev|build|run|install`
-- Windows, macOS, iOS, or OpenBSD host builds
-- An emulator, device, or GUI session
-- The GitHub Actions workflow in `.github/workflows/core.yml` (the file is in the tree; this session did not wait on a GitHub run)
+The machine also needs the installed Evergreen WebView2 runtime. This session did not run those commands.
+
+Android, when an SDK exists:
+
+```sh
+export ANDROID_HOME=/path/to/sdk
+./nob config target android
+./nob android init --package com.example.crossweb --app-name Crossweb
+./nob android build
+```
+
+`nob android` still shells out through `cmd.exe` for Gradle. `assembleRelease` is unsigned. A debug keystore is not configured as the release credential. Debug builds may cleartext-load `localhost` and `127.0.0.1` only through `debug-overrides`. Release cleartext is denied. `dev-url.txt` in the APK assets is the only dev-server switch, and a rejected file leaves the app on bundled content. None of this was executed here.
 
 ## Recorded results
 
-Before these changes, on this machine:
+Compiler: Ubuntu clang 18.1.3. WebKitGTK 2.52.6.
 
-- `cc -o nob nob.c` failed with `src_build/common.c: fatal error: 'direct.h' file not found`.
-- `cc -std=c99 -o nob nob.c` also failed inside `thirdparty/nob.h` (`struct timespec`, `clock_gettime`, `PATH_MAX`). `nob.h` expects the compiler's default GNU dialect. The bootstrap command is `cc -o nob nob.c`, not `-std=c99`.
-- There was no test binary and no CI workflow.
-- `src_build/nob_linux.c` passed the text `` `pkg-config --cflags --libs gtk+-3.0 webkit2gtk-4.0` `` as one argv element, and `src/webview.c` did not call GTK or WebKit.
+`bash scripts/check.sh` exited 0.
 
-After these changes, `bash scripts/check.sh` exited 0.
+- `test_core: 392 checks, 0 failures`
+- `test_bounds: 63 checks, 0 failures`
+- `test_fs: 34 checks, 0 failures`
+- Link used `pkg-config webkit2gtk-4.1`. `ldd` resolved `libwebkit2gtk-4.1.so.0` and `libgtk-3.so.0`. It did not resolve Chromium, CEF, or Electron.
+- Smoke log contained `plug_invoke: denied fs.read` and `smoke: title=crossweb-smoke-ok fs_entered=0 ping_entered=1`.
+- Screenshot: `build/linux-smoke.png` (also copied for review). The page text was "Native ping returned ready1. fs.read was denied."
+- `CROSSWEB_DEV_URL=http://evil.test:5173` exited 1 with `dev URL is not an explicit localhost origin`.
+- Shutdown also printed a GLib-GIO warning about releasing the sandboxed WebProcess bus name. That is not a failed smoke.
 
-- `test_core: 391 checks, 0 failures`
-- Generated `build/config.h` contained `#define CROSSWEB_HOTRELOAD 0`, `#define CROSSWEB_WEBVIEW_DEBUG 0`, and `#define CROSSWEB_TARGET_LINUX 1`. The Win64/macOS/Android/iOS/OpenBSD target lines stayed comments.
-- Link line: `cc -Wall -Wextra -Werror -ggdb -I. -include build/config.h -o ./build/crossweb ./src/plug.c ./src/ipc.c ./src/webview.c` plus `src/plugins/fs/*.c`, `src/plugins/keystore/src/plugin.c`, and `-lm -ldl -lpthread`.
-- `ldd ./build/crossweb` resolved `linux-vdso.so.1`, `libm.so.6`, `libc.so.6`, and `ld-linux-x86-64.so.2` only.
-- `stdbuf -oL -eL timeout 0.5 ./build/crossweb` exited 124. Stdout was:
+Not run, and not claimed as runtime validation:
 
-```text
-Plugin registered: fs (v100)
-Plugin registered: keystore (v100)
-FS plugin initialized on linux
-Keystore plugin initialized
-```
+- Windows compile or launch. `x86_64-w64-mingw32-g++` is absent. `WEBVIEW2_INCLUDE` was not set.
+- Android compile, install, or launch. `ANDROID_HOME` is unset. `gradle` and `sdkmanager` are absent.
+- `nob init`, `nob dev`, `nob build`, and `nob android`.
+- A physical display, device, or emulator. The Linux check used Xvfb.
 
-Stderr was empty, which matches the committed `crossweb.permissions` loading with zero grants.
+## Limits that are still true
 
-### Test limitations
+- The fs jail is not a defense against a concurrent process swapping directories for symlinks after the open check. Symlinks are rejected, and the Linux open uses `O_NOFOLLOW`.
+- Android navigation blocking applies to main-frame and subframe navigations. `addJavascriptInterface` is still exposed to script in any document that actually loads. The main-frame URL check in `Ipc.kt` does not identify the calling frame.
+- WebView2 resource blocking and navigation cancellation are written in `src/win/host.cpp` and were not compiled.
+- Keystore commands remain unimplemented as a safe cross-platform store. They are not granted.
+- The Windows hot-reload DLL path is not part of the new WebView2 host.
 
-- `tests/test_core.c` does not link `fs` or `keystore`. A grant for `fs.read` is checked as data; the test never calls `fopen`.
-- The tests do not load a WebView or execute `src/plugins/ipc/ipc.js`.
-- The Android template edits (trusted-page check, base64 `evaluateJavascript`) were not compiled.
-- The 0.5s Linux launch shows process startup only. It is not a UI test and it does not prove a window can appear.
-- Windows hot reload, WebView2, and the keystore WebAuthn path were not compiled or launched.
+## Next milestone
 
-## Security defaults in this milestone
-
-- Native commands are denied until a `plugin.command` line is granted. Web content cannot add grants.
-- `plug_invoke` rejects malformed names, does not log payloads, and checks the grant before it looks up a plugin.
-- IPC ids and commands must match `[A-Za-z0-9._:-]` and the existing length caps before they are queued. Response and event delivery use the same check so a quote cannot be interpolated into the Windows script string.
-- Hot reload and WebView remote debugging default off.
-- The Android template refuses `JavascriptInterface` calls unless the main-frame URL is the asset origin or a localhost/loopback dev URL, and it base64-encodes values passed into `evaluateJavascript`.
-
-Grants are not a sandbox. Uncommenting `fs.read` or `fs.write` still allows any path the process can open. The filesystem JSON parser is a stub. Keystore commands still handle secrets with no extra confinement. Android's URL check is the main frame only; `addJavascriptInterface` remains visible to script in that page.
-
-## Next milestones
-
-### 1. One real desktop WebView shell
+Make one non-Linux host match the Linux smoke.
 
 Acceptance:
 
-- A WebView dependency is vendored or fetched by a command written in this document. Today `thirdparty/webview-c` is absent, and the Linux `main` does not call WebKit.
-- The default page is bundled app content. `http://localhost:5173` is opt-in.
-- Navigation outside the app origin cannot reach `plug_invoke`.
-- A CI job for that host shows an unlisted command returns `{"ok":false,"error":"permission denied"}` without entering the plugin, and one granted test command round-trips a payload.
-- `fs.read` and `fs.write` refuse paths outside an app data directory. A grant must not mean "any path `fopen` accepts."
-
-### 2. Stop shipping privileged plugins as open `fopen` / secret helpers
-
-Acceptance:
-
-- `fs` path checks have tests for absolute paths, `..`, and links, and they fail closed.
-- Keystore responses are covered by tests that do not require Windows Hello. Unsupported platforms keep returning an error and do not crash on a null callback.
-- The per-plugin JSON files under `permissions/` are either enforced by the same gate or removed so they cannot be mistaken for policy.
-
-### 3. One packaged target with the grant file inside the package
-
-Acceptance:
-
-- Android or one desktop OS produces an installable artifact without the debug signing config.
-- The running app loads grants from the package, not from whatever the current working directory happens to contain.
-- `nob android` or the desktop package command runs without `cmd.exe` when the documented host is not Windows.
-- That package is launched once and the milestone-1 permission denial is reproduced there.
-
-Until those pass, do not describe Crossweb as production-ready.
+- On a Windows machine, `./nob` with `WEBVIEW2_INCLUDE` and `WEBVIEW2_LIB` produces `build/crossweb.exe`, `ldd`/module list shows `WebView2Loader` and not a Fixed Version runtime directory, and `--smoke` prints `fs_entered=0` and `ping_entered=1` against `https://crossweb.localhost`.
+- Or, on an Android SDK machine, `assembleDebug` installs an APK whose WebView is `android.webkit.WebView`, bundled assets load, `app.ping` round-trips, `fs.read` is denied, and a navigation off `https://appassets.androidplatform.net` does not run. Release stays unsigned until a real keystore is configured.
+- The other of those two stays listed as unverified until the same smoke exists.
+- CI for the host that was actually executed is required. Xvfb remains the Linux check.

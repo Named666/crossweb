@@ -147,8 +147,9 @@ int nob_cli_main(int argc, char **argv)
 
                 // Start Vite dev server in background
                 if (!run_npm_command("run dev", true)) return 1;
-                // Modify MainActivity for dev
-                if (!replace_all_in_file(main_activity_path, "webView.loadUrl(\"https://appassets.androidplatform.net/index.html\")", "webView.loadUrl(\"http://localhost:5173\")")) return 1;
+                if (!mkdir_if_not_exists("android/app/src/main/assets")) return 1;
+                if (!write_entire_file("android/app/src/main/assets/dev-url.txt", "http://127.0.0.1:5173\n", strlen("http://127.0.0.1:5173\n"))) return 1;
+                (void)main_activity_path;
                 // Build debug APK
                 Cmd cmd = {0};
                 cmd_append(&cmd, "cmd");

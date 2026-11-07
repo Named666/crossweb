@@ -1,6 +1,10 @@
 #ifndef PLUG_H_
 #define PLUG_H_
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stddef.h>
 #include <stdbool.h>
 typedef void* webview_t;
@@ -112,6 +116,10 @@ LIST_OF_PLUGS
 extern JNIEnv *global_env;
 extern jobject global_obj;
 extern jmethodID emitMethodId;
+#endif
+
+#ifdef __cplusplus
+}
 #endif
 
 #endif // PLUG_H_

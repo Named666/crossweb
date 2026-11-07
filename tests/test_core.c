@@ -227,6 +227,7 @@ static void test_grant_file(void) {
 
     plug_revoke_all();
     CHECK(plug_load_grants("crossweb.permissions"));
+    CHECK(plug_is_allowed("app", "ping"));
     CHECK(!plug_is_allowed("fs", "read"));
     CHECK(!plug_is_allowed("fs", "write"));
     CHECK(!plug_is_allowed("keystore", "encrypt"));
