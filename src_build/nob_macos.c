@@ -14,7 +14,7 @@ bool build_dist(void)
         return false;
     }
 
-#ifdef CROSSWEB_HOTRELOAD
+#if CROSSWEB_HOTRELOAD
     procs.count = 0;
     cmd.count = 0;
         nob_cmd_append(&cmd, "clang");

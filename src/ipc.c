@@ -41,6 +41,21 @@ static bool ipc_queue_push(const IpcMessage *msg) {
     return true;
 }
 
+bool ipc_identifier_ok(const char *value, size_t max_len) {
+    if (value == NULL || value[0] == '\0' || max_len < 2) return false;
+    size_t n = 0;
+    for (const unsigned char *p = (const unsigned char *)value; *p; ++p) {
+        unsigned char c = *p;
+        int ok = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
+                 (c >= '0' && c <= '9') || c == '.' || c == '_' || c == ':' || c == '-';
+        if (!ok) return false;
+        n++;
+        if (n >= max_len) return false;
+    }
+    return true;
+}
+
+#ifdef _WIN32
 static bool base64_encode(const unsigned char *input, size_t len, char *output, size_t output_cap) {
     static const char table[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     size_t needed = ((len + 2) / 3) * 4;
@@ -63,6 +78,7 @@ static bool base64_encode(const unsigned char *input, size_t len, char *output, 
     output[j] = '\0';
     return true;
 }
+#endif
 
 static int base64_value(char c) {
     if (c >= 'A' && c <= 'Z') return c - 'A';
@@ -221,6 +237,10 @@ bool ipc_handle_js_message(const char *message) {
     memcpy(msg.cmd, first + 1, cmd_len);
     msg.cmd[cmd_len] = '\0';
 
+    if (!ipc_identifier_ok(msg.id, IPC_MAX_ID_LEN) || !ipc_identifier_ok(msg.cmd, IPC_MAX_CMD_LEN)) {
+        return false;
+    }
+
     if (!decode_payload_field(second + 1, msg.payload, sizeof(msg.payload))) {
         fprintf(stderr, "IPC: failed to decode payload for %s\n", msg.cmd);
         ipc_response(msg.id, "{\"ok\":false,\"error\":\"invalid payload\"}");
@@ -235,6 +255,7 @@ bool ipc_handle_js_message(const char *message) {
     return true;
 }
 
+#ifdef _WIN32
 static char *build_dispatch_script(const char *format, const char *id, const char *encoded_payload) {
     if (id == NULL || encoded_payload == NULL) {
         return NULL;
@@ -250,9 +271,10 @@ static char *build_dispatch_script(const char *format, const char *id, const cha
     snprintf(buffer, (size_t)needed + 1, format, id, encoded_payload);
     return buffer;
 }
+#endif
 
 void ipc_response(const char *id, const char *response_json) {
-    if (id == NULL || id[0] == '\0' || response_json == NULL) {
+    if (!ipc_identifier_ok(id, IPC_MAX_ID_LEN) || response_json == NULL) {
         return;
     }
 #ifdef __ANDROID__
@@ -283,7 +305,7 @@ void ipc_response(const char *id, const char *response_json) {
 }
 
 void ipc_emit_event(const char *event, const char *data_json) {
-    if (event == NULL || event[0] == '\0' || data_json == NULL) {
+    if (!ipc_identifier_ok(event, IPC_MAX_CMD_LEN) || data_json == NULL) {
         return;
     }
 #ifdef _WIN32

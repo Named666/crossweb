@@ -19,6 +19,23 @@
 #include "plug.h"
 #include "ipc.h"
 
+#ifndef CROSSWEB_WEBVIEW_DEBUG
+#define CROSSWEB_WEBVIEW_DEBUG 0
+#endif
+
+static void load_capability_grants(void) {
+    const char *path = "crossweb.permissions";
+    FILE *probe = fopen(path, "rb");
+    if (probe == NULL) {
+        fprintf(stderr, "crossweb: %s is absent; native commands are denied until granted\n", path);
+        return;
+    }
+    fclose(probe);
+    if (!plug_load_grants(path)) {
+        fprintf(stderr, "crossweb: %s was rejected; grants from that file are not active\n", path);
+    }
+}
+
 #ifdef _WIN32
 
 static char g_start_url[MAX_PATH * 4];
@@ -134,7 +151,7 @@ static void configure_webview(struct webview *wv) {
     wv->width = 1280;
     wv->height = 800;
     wv->resizable = 1;
-    wv->debug = 1;
+    wv->debug = CROSSWEB_WEBVIEW_DEBUG;
     wv->external_invoke_cb = handle_external_invoke;
     wv->ready_cb = on_webview_ready;
 }
@@ -150,7 +167,7 @@ int main(void) {
         return 1;
     }
 
-#ifdef CROSSWEB_HOTRELOAD
+#if CROSSWEB_HOTRELOAD
     if (plug_set_host_emit_event != NULL) {
         plug_set_host_emit_event(host_emit_event);
     }
@@ -164,11 +181,12 @@ int main(void) {
     }
 
     ipc_init((webview_t)&wv);
+    load_capability_grants();
     plug_init((webview_t)&wv);
 
     bool running = true;
     while (running && webview_loop(&wv, 1) == 0) {
-#ifdef CROSSWEB_HOTRELOAD
+#if CROSSWEB_HOTRELOAD
         if (reload_libplug_changed()) {
             void *state = plug_pre_reload();
             if (reload_libplug()) {
@@ -201,10 +219,11 @@ int main(void)
     sigaction(SIGPIPE, &act, NULL);
 
     if (!reload_libplug()) return 1;
+    load_capability_grants();
     plug_init((webview_t)NULL);
 
     for (;;) {
-#ifdef CROSSWEB_HOTRELOAD
+#if CROSSWEB_HOTRELOAD
         if (reload_libplug_changed()) {
             void *state = plug_pre_reload();
             if (!reload_libplug()) return 1;

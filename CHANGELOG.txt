@@ -1,0 +1,5 @@
+2026-11-07
+- Deny native plugin commands unless crossweb.permissions grants them.
+- Add portable IPC and permission tests, a Linux nob bootstrap, and docs/READINESS.md.
+- Turn hot reload and WebView remote debugging off unless configured.
+- This pass does not make the framework production-ready.

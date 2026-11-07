@@ -1,0 +1,16 @@
+# Crossweb capability grants.
+# The host loads this file from the process working directory at startup.
+# One plugin.command per line. Commands that are not listed are denied.
+# A line whose first character is # is a comment. Blank lines are ignored.
+#
+# Granted commands are not sandboxed. fs.read and fs.write can reach any path
+# the OS user can access. keystore commands handle secrets. Uncomment a line
+# only when this app's own UI is the caller you intend to trust.
+#
+# fs.read
+# fs.write
+# keystore.encrypt
+# keystore.decrypt
+# keystore.save
+# keystore.load
+# keystore.get

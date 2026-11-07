@@ -16,6 +16,8 @@ typedef struct {
 
 void ipc_init(webview_t wv);
 bool ipc_receive(IpcMessage *msg);
+/* True when value is a non-empty token of length < max_len using [A-Za-z0-9._:-]. */
+bool ipc_identifier_ok(const char *value, size_t max_len);
 bool ipc_handle_js_message(const char *message);
 void ipc_inject_bridge(void);
 void ipc_response(const char *id, const char *response_json);

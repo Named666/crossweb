@@ -1,9 +1,14 @@
 #include "common.h"
-#include <string.h>
+#include <ctype.h>
+#include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/stat.h>
+#ifdef _WIN32
 #include <direct.h>
-#include <stdio.h> // for sprintf
+#else
+#include <unistd.h>
+#endif
 
 // Moved from config.c
 const char *get_package_name(void) {

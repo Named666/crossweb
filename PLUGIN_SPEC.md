@@ -77,9 +77,8 @@ window.external.listen('plugin.event', (data) => {
 ## 3. Security Model
 
 ### 3.1 Permission System
-- **Config File**: `crossweb.config.json` with plugin permissions
-- **ACL**: Allowlist of commands per plugin
-- **Runtime Checks**: Enforce permissions before command execution
+- **Enforced now**: `plug_invoke` denies every `plugin.command` unless that exact pair was granted with `plug_grant` or loaded from `crossweb.permissions`. The shipped file grants nothing. A missing or malformed grant file does not open access.
+- **Not enforced**: `crossweb.config.json`, the per-plugin JSON files under `permissions/`, path/network sandboxes, and origin checks on the Windows host. Android's template restricts `JavascriptInterface` calls to the asset origin and local dev URLs, but that template has not been executed in CI.
 
 ### 3.2 Sandboxing
 - **File Access**: Restrict to app directories
@@ -105,6 +104,9 @@ window.external.listen('plugin.event', (data) => {
 - [x] Implement basic IPC
 - [x] Create plugin registration system
 - [ ] Implement permission system
+  - [x] Deny-by-default `plugin.command` grants in `plug_invoke`, covered by `tests/test_core.c`
+  - [ ] JSON ACLs (`crossweb.config.json` and `permissions/*.json`) are not enforced
+  - [ ] Filesystem, network, and WebView origin sandboxes are not enforced on desktop
 
 ### Phase 2: Core Plugins
 - [x] Keystore plugin

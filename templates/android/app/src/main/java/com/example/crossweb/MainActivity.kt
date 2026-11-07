@@ -37,7 +37,7 @@ class MainActivity : AppCompatActivity() {
 
         // Important: enables JavaScript (if your HTML needs it)
         webView.settings.javaScriptEnabled = true
-        webView.settings.safeBrowsingEnabled = false
+        webView.settings.safeBrowsingEnabled = true
 
         // Disable caching and storage to minimize data usage
         webView.settings.cacheMode = WebSettings.LOAD_NO_CACHE

@@ -14,49 +14,47 @@ bool build_dist(void)
         return false;
     }
 
-#ifdef CROSSWEB_HOTRELOAD
+    nob_log(NOB_INFO, "Linux GUI WebView host is not implemented; linking the native runtime only");
+
+#if CROSSWEB_HOTRELOAD
     cmd_append(&cmd, "cc");
-    cmd_append(&cmd, "-Wall", "-Wextra", "-ggdb");
+    cmd_append(&cmd, "-Wall", "-Wextra", "-Werror", "-ggdb");
     cmd_append(&cmd, "-I.");
     cmd_append(&cmd, "-include", "build/config.h");
     cmd_append(&cmd, "-DCROSSWEB_BUILDING_PLUG=1");
     cmd_append(&cmd, "-fPIC", "-shared");
     cmd_append(&cmd, "-o", "./build/libplug.so");
     cmd_append(&cmd, "./src/plug.c", "./src/ipc.c");
-    
-    // Add all discovered plugin sources
+
     for (size_t i = 0; i < plugin_sources.count; ++i) {
         cmd_append(&cmd, plugin_sources.items[i]);
     }
-    
+
     cmd_append(&cmd, "-lm", "-ldl", "-lpthread");
     if (!cmd_run(&cmd)) return_defer(false);
 
     cmd_append(&cmd, "cc");
-    cmd_append(&cmd, "-Wall", "-Wextra", "-ggdb");
+    cmd_append(&cmd, "-Wall", "-Wextra", "-Werror", "-ggdb");
     cmd_append(&cmd, "-I.");
     cmd_append(&cmd, "-include", "build/config.h");
     cmd_append(&cmd, "-o", "./build/crossweb");
     cmd_append(&cmd, "./src/webview.c", "./src/hotreload_posix.c");
     cmd_append(&cmd, "-Wl,-rpath=./build/", "-Wl,-rpath=./");
     cmd_append(&cmd, "-lm", "-ldl", "-lpthread");
-    cmd_append(&cmd, "`pkg-config --cflags --libs gtk+-3.0 webkit2gtk-4.0`");
     if (!cmd_run(&cmd)) return_defer(false);
 #else
     cmd_append(&cmd, "cc");
-    cmd_append(&cmd, "-Wall", "-Wextra", "-ggdb");
+    cmd_append(&cmd, "-Wall", "-Wextra", "-Werror", "-ggdb");
     cmd_append(&cmd, "-I.");
     cmd_append(&cmd, "-include", "build/config.h");
     cmd_append(&cmd, "-o", "./build/crossweb");
     cmd_append(&cmd, "./src/plug.c", "./src/ipc.c", "./src/webview.c");
-    
-    // Add all discovered plugin sources
+
     for (size_t i = 0; i < plugin_sources.count; ++i) {
         cmd_append(&cmd, plugin_sources.items[i]);
     }
-    
+
     cmd_append(&cmd, "-lm", "-ldl", "-lpthread");
-    cmd_append(&cmd, "`pkg-config --cflags --libs gtk+-3.0 webkit2gtk-4.0`");
     if (!cmd_run(&cmd)) return_defer(false);
 #endif // CROSSWEB_HOTRELOAD
 

@@ -18,7 +18,7 @@ bool build_dist(void)
     Nob_File_Paths plugin_libs = {0};
     collect_plugin_libs(&plugin_libs);
 
-#ifdef CROSSWEB_HOTRELOAD
+#if CROSSWEB_HOTRELOAD
     cmd_append(&cmd, "gcc");
     cmd_append(&cmd, "-Wall", "-Wextra", "-ggdb");
     cmd_append(&cmd, "-I.");
