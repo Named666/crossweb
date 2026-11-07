@@ -1,112 +1,105 @@
 package {{PACKAGE_NAME}}
 
+import android.os.Build
 import android.os.Bundle
-import android.webkit.*
+import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
+import android.webkit.WebSettings
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import androidx.appcompat.app.AppCompatActivity
 import androidx.webkit.WebViewAssetLoader
-import android.app.KeyguardManager
-import android.content.Context
-import android.content.Intent
-import android.provider.Settings
-import androidx.appcompat.app.AlertDialog
+import android.util.Log
 
 class MainActivity : AppCompatActivity() {
+    private var devOrigin: String? = null
+    private var devUrl: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // Check if device has secure lock screen
-        val keyguardManager = getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
-        if (!keyguardManager.isDeviceSecure) {
-            AlertDialog.Builder(this)
-                .setTitle("Secure Lock Screen Required")
-                .setMessage("This app requires a secure lock screen (PIN, pattern, or password) to protect your data. Please set one up.")
-                .setPositiveButton("Go to Settings") { _, _ ->
-                    startActivity(Intent(Settings.ACTION_SECURITY_SETTINGS))
-                }
-                .setNegativeButton("Cancel") { _, _ ->
-                    finish()
-                }
-                .setCancelable(false)
-                .show()
-            return
-        }
+        readDevUrl()
 
         val webView: WebView = findViewById(R.id.webview)
-
-        // Important: enables JavaScript (if your HTML needs it)
         webView.settings.javaScriptEnabled = true
-        webView.settings.safeBrowsingEnabled = false
+        webView.settings.allowFileAccess = false
+        webView.settings.allowContentAccess = false
+        webView.settings.allowFileAccessFromFileURLs = false
+        webView.settings.allowUniversalAccessFromFileURLs = false
+        webView.settings.mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
+        if (Build.VERSION.SDK_INT >= 26) {
+            webView.settings.safeBrowsingEnabled = true
+        }
+        if (BuildConfig.DEBUG) {
+            WebView.setWebContentsDebuggingEnabled(true)
+        }
 
-        // Disable caching and storage to minimize data usage
-        webView.settings.cacheMode = WebSettings.LOAD_NO_CACHE
-        webView.settings.databaseEnabled = false
-        webView.settings.domStorageEnabled = false
-        webView.clearCache(true)
-        webView.clearHistory()
-
-        // Set up asset loader for local assets
         val assetLoader = WebViewAssetLoader.Builder()
             .setDomain("appassets.androidplatform.net")
             .addPathHandler("/", WebViewAssetLoader.AssetsPathHandler(this))
             .build()
 
-        // Makes sure links open inside the WebView instead of external browser
         webView.webViewClient = object : WebViewClient() {
+            override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
+                val url = request.url?.toString() ?: return true
+                // Applies to main-frame and subframe navigations. This stops an
+                // untrusted document from loading. It does not make the
+                // JavascriptInterface able to tell frames apart.
+                if (!isTrusted(url)) {
+                    Log.e(TAG, "blocked navigation")
+                    return true
+                }
+                return false
+            }
+
             override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
                 return assetLoader.shouldInterceptRequest(request.url)
             }
-
-            override fun onPageFinished(view: WebView?, url: String?) {
-                view?.evaluateJavascript("""
-                    var meta = document.createElement('meta');
-                    meta.httpEquiv = 'Content-Security-Policy';
-                    meta.content = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';";
-                    document.head.appendChild(meta);
-                """, null)
-            }
         }
 
-        // Handle JS dialogs
-        webView.webChromeClient = object : WebChromeClient() {
-            override fun onJsAlert(view: WebView?, url: String?, message: String?, result: JsResult?): Boolean {
-                android.app.AlertDialog.Builder(this@MainActivity)
-                    .setTitle("Alert")
-                    .setMessage(message)
-                    .setPositiveButton("OK") { _, _ -> result?.confirm() }
-                    .setCancelable(false)
-                    .show()
-                return true
-            }
-        }
-
-        // Load native library
         System.loadLibrary("crossweb")
-
-        // Add JS interface
         val ipc = Ipc(webView)
         ipc.setActivity(this)
+        ipc.setAppDataRoot(filesDir.absolutePath)
         webView.addJavascriptInterface(ipc, "external")
 
-        // Inject JS bridge for events
-        webView.evaluateJavascript("""
-            window.external.listen = function(callback) {
-                window.external.onEvent = callback;
-            };
-        """, null)
-
-        // Load the local HTML file from assets folder via asset loader
-        webView.loadUrl("https://appassets.androidplatform.net/index.html")
+        val start = devUrl ?: "https://appassets.androidplatform.net/index.html"
+        webView.loadUrl(start)
     }
 
-    // Optional: handle back button to navigate web history
-    override fun onBackPressed() {
-        val webView: WebView = findViewById(R.id.webview)
-        if (webView.canGoBack()) {
-            webView.goBack()
-        } else {
-            super.onBackPressed()
+    private fun readDevUrl() {
+        try {
+            val text = assets.open("dev-url.txt").bufferedReader().use { it.readText() }.trim()
+            val origin = devOriginOrNull(text)
+            if (origin == null) {
+                Log.e(TAG, "dev-url.txt was rejected; staying on bundled content")
+                return
+            }
+            devUrl = text
+            devOrigin = origin
+        } catch (_: Exception) {
+            devUrl = null
+            devOrigin = null
         }
+    }
+
+    private fun devOriginOrNull(url: String): String? {
+        val match = Regex("^(https?)://(localhost|127\\.0\\.0\\.1):([0-9]{1,5})(/.*)?$").matchEntire(url)
+            ?: return null
+        val port = match.groupValues[3].toIntOrNull() ?: return null
+        if (port !in 1..65535) return null
+        return "${match.groupValues[1]}://${match.groupValues[2]}:$port"
+    }
+
+    private fun isTrusted(url: String): Boolean {
+        if (url == APP_ORIGIN || url.startsWith("$APP_ORIGIN/")) return true
+        val dev = devOrigin ?: return false
+        return url == dev || url.startsWith("$dev/")
+    }
+
+    companion object {
+        private const val TAG = "Crossweb"
+        private const val APP_ORIGIN = "https://appassets.androidplatform.net"
     }
 }

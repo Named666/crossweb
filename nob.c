@@ -24,14 +24,9 @@ int main(int argc, char **argv)
     if (cli_result == 1) return 1; // CLI signaled error
     if (cli_result == 0) return 0; // CLI already handled a command
 
-    if (cli_result != 2) {
-        // cli_result returned a build target as a string (i.e. "CROSSWEB_TARGET_WIN64_GCC")
-        // Append "-D " to the beginning of the  cli_result string
-        target_string = nob_temp_sprintf("./src_build/nob_stage2.c -D %s", cli_result);
-    } else {
-        // Default target if none specified
-        target_string = "./src_build/nob_stage2.c";
-    }
+    /* cli_result 2 means "no subcommand". The target macro comes from build/config.h. */
+    (void)cli_result;
+    target_string = "./src_build/nob_stage2.c";
 
 
     Cmd cmd = {0};

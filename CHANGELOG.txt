@@ -1,0 +1,11 @@
+2026-11-07
+- Linux host uses the distro WebKitGTK WebView and bundled assets.
+- app.ping is the only granted command. fs access is confined to app data.
+- Windows host targets the installed WebView2 runtime. Android template no longer treats a debug keystore as release signing.
+- macOS, iOS, and OpenBSD builds are deferred.
+
+2026-11-07
+- Deny native plugin commands unless crossweb.permissions grants them.
+- Add portable IPC and permission tests, a Linux nob bootstrap, and docs/READINESS.md.
+- Turn hot reload and WebView remote debugging off unless configured.
+- This pass does not make the framework production-ready.

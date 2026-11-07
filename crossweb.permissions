@@ -1,0 +1,17 @@
+# Crossweb capability grants.
+# The host loads this file from the process working directory at startup.
+# One plugin.command per line. Commands that are not listed are denied.
+# A line whose first character is # is a comment. Blank lines are ignored.
+#
+# app.ping is the sample shell's only grant. It returns a nonce and touches no
+# files or secrets. fs.read and fs.write stay commented out. If they are
+# uncommented later, path checks still confine them to the app data directory
+# and reject symlinks. That confinement is not an OS sandbox.
+app.ping
+# fs.read
+# fs.write
+# keystore.encrypt
+# keystore.decrypt
+# keystore.save
+# keystore.load
+# keystore.get

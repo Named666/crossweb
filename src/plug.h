@@ -1,6 +1,10 @@
 #ifndef PLUG_H_
 #define PLUG_H_
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stddef.h>
 #include <stdbool.h>
 typedef void* webview_t;
@@ -69,7 +73,18 @@ typedef struct Plugin {
 // These are intentionally not part of LIST_OF_PLUGS to keep the hotreload DLL
 // boundary small, but they remain part of the public header so plugins can
 // compile and the core can evolve without breaking source compatibility.
+#define PLUG_NAME_CAP 64
+
 void plug_register(Plugin *plugin);
+bool plug_has(const char *name);
+/* Grant one plugin.command. Names are [A-Za-z0-9_-]{1..63}. Denied by default. */
+bool plug_grant(const char *plugin, const char *command);
+void plug_revoke_all(void);
+bool plug_is_allowed(const char *plugin, const char *command);
+/* Load plugin.command lines. Comments (#) and blank lines are ignored.
+   On a malformed file, grants made by this call are rolled back and false is returned.
+   A missing file returns false and does not change existing grants. */
+bool plug_load_grants(const char *path);
 bool plug_load(const char *path);
 void *plug_load_resource(const char *file_path, size_t *size);
 void plug_free_resource(void *data);
@@ -88,7 +103,7 @@ void plug_free_resource(void *data);
 LIST_OF_PLUGS
 #undef PLUG
 
-#if defined(CROSSWEB_HOTRELOAD) && !defined(CROSSWEB_BUILDING_PLUG)
+#if CROSSWEB_HOTRELOAD && !defined(CROSSWEB_BUILDING_PLUG)
     #define PLUG(name, ret, ...) extern name##_t *name;
 #else
     #define PLUG(name, ret, ...) CROSSWEB_API ret name(__VA_ARGS__);
@@ -101,6 +116,10 @@ LIST_OF_PLUGS
 extern JNIEnv *global_env;
 extern jobject global_obj;
 extern jmethodID emitMethodId;
+#endif
+
+#ifdef __cplusplus
+}
 #endif
 
 #endif // PLUG_H_

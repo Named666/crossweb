@@ -9,7 +9,6 @@ android {
     compileSdk = 36
     namespace = "{{PACKAGE_NAME}}"
     defaultConfig {
-        manifestPlaceholders["usesCleartextTraffic"] = "false"
         applicationId = "{{PACKAGE_NAME}}"
         minSdk = 24
         targetSdk = 36
@@ -23,7 +22,6 @@ android {
     }
     buildTypes {
         getByName("debug") {
-            manifestPlaceholders["usesCleartextTraffic"] = "true"
             isDebuggable = true
             isJniDebuggable = true
             isMinifyEnabled = false
@@ -41,7 +39,7 @@ android {
                     .plus(getDefaultProguardFile("proguard-android-optimize.txt"))
                     .toList().toTypedArray()
             )
-            signingConfig = signingConfigs.getByName("debug")
+            // Unsigned on purpose. A debug keystore is not a release credential.
         }
     }
     kotlinOptions {

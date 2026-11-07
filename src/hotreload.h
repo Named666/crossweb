@@ -3,10 +3,10 @@
 
 #include <stdbool.h>
 
-#include "plug.h"
 #include "build/config.h"
+#include "plug.h"
 
-#ifdef CROSSWEB_HOTRELOAD
+#if CROSSWEB_HOTRELOAD
     #define PLUG(name, ...) extern name##_t *name;
     LIST_OF_PLUGS
     #undef PLUG

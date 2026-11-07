@@ -1,0 +1,40 @@
+:root {
+  color: #14221b;
+  background: #f4f1e8;
+  font-family: "Liberation Sans", "DejaVu Sans", sans-serif;
+}
+
+body {
+  margin: 0;
+}
+
+main {
+  max-width: 36rem;
+  margin: 3rem auto;
+  padding: 0 1.25rem;
+}
+
+h1 {
+  font-size: 2rem;
+  margin-bottom: 0.25rem;
+}
+
+.lede {
+  color: #3d4a42;
+}
+
+#status {
+  min-height: 3rem;
+  padding: 0.75rem 1rem;
+  background: #fff;
+  border: 1px solid #d5d0c4;
+}
+
+button {
+  margin-top: 1rem;
+  padding: 0.55rem 0.9rem;
+  border: 0;
+  background: #1f6b45;
+  color: #fff;
+  font: inherit;
+}

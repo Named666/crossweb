@@ -80,29 +80,10 @@ bool build_dist(void) {
     char main_activity_path[1024];
     sprintf(main_activity_path, "android/app/src/main/java/%s/MainActivity.kt", package_path);
 
-    Nob_Cmd cmd = {0};
-    nob_cmd_append(&cmd, "cmd");
-    nob_cmd_append(&cmd, "/c");
-    nob_cmd_append(&cmd, "cd");
-    nob_cmd_append(&cmd, "web");
-    nob_cmd_append(&cmd, "&&");
-    nob_cmd_append(&cmd, "npm");
-    nob_cmd_append(&cmd, "run");
-    nob_cmd_append(&cmd, "build");
-    if (!nob_cmd_run_sync(cmd)) { nob_cmd_free(cmd); return false; }
-    nob_cmd_free(cmd);
-
+    (void)main_activity_path;
     if (!mkdir_if_not_exists("android/app/src/main/assets")) return false;
-    Nob_Cmd copy_cmd = {0};
-    nob_cmd_append(&copy_cmd, "xcopy");
-    nob_cmd_append(&copy_cmd, "web\\dist\\*");
-    nob_cmd_append(&copy_cmd, "android\\app\\src\\main\\assets\\");
-    nob_cmd_append(&copy_cmd, "/s");
-    nob_cmd_append(&copy_cmd, "/y");
-    if (!nob_cmd_run_sync(copy_cmd)) { nob_cmd_free(copy_cmd); return false; }
-    nob_cmd_free(copy_cmd);
-
-    if (!replace_all_in_file(main_activity_path, "webView.loadUrl(\"http://localhost:5173\")", "webView.loadUrl(\"https://appassets.androidplatform.net/index.html\")")) return false;
+    if (!copy_dir_recursive("assets", "android/app/src/main/assets")) return false;
+    remove("android/app/src/main/assets/dev-url.txt");
 
     if (!mkdir_if_not_exists("android/app/src/main/c")) return false;
     if (!copy_file("src/android_bridge.c", "android/app/src/main/c/android_bridge.c")) return false;
@@ -126,6 +107,13 @@ bool build_dist(void) {
     if (!copy_file("src/plugins/fs/error.c", "android/app/src/main/c/plugins/fs/error.c")) return false;
     if (!copy_file("src/plugins/fs/error.h", "android/app/src/main/c/plugins/fs/error.h")) return false;
     if (!copy_file("src/plugins/fs/models.h", "android/app/src/main/c/plugins/fs/models.h")) return false;
+    if (!copy_file("src/plugins/fs/path.c", "android/app/src/main/c/plugins/fs/path.c")) return false;
+    if (!copy_file("src/plugins/fs/path.h", "android/app/src/main/c/plugins/fs/path.h")) return false;
+    if (!copy_file("src/safe_open.c", "android/app/src/main/c/safe_open.c")) return false;
+    if (!copy_file("src/safe_open.h", "android/app/src/main/c/safe_open.h")) return false;
+    if (!mkdir_if_not_exists("android/app/src/main/c/plugins/app")) return false;
+    if (!copy_file("src/plugins/app/lib.c", "android/app/src/main/c/plugins/app/lib.c")) return false;
+    if (!copy_file("src/plugins/app/plugin.h", "android/app/src/main/c/plugins/app/plugin.h")) return false;
     if (!copy_file("src/plugins/fs/plugin.h", "android/app/src/main/c/plugins/fs/plugin.h")) return false;
 
     if (!mkdir_if_not_exists("android/app/src/main/c/plugins/keystore")) return false;
@@ -146,6 +134,7 @@ bool build_dist(void) {
     nob_cmd_append(&gradle_cmd, "gradle");
     nob_cmd_append(&gradle_cmd, "assembleRelease");
     nob_cmd_append(&gradle_cmd, "--stacktrace");
+    nob_log(NOB_WARNING, "assembleRelease has no production signing config. The APK is not release-ready.");
     bool result = nob_cmd_run_sync(gradle_cmd);
     nob_cmd_free(gradle_cmd);
     return result;

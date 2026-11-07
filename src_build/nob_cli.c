@@ -12,7 +12,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <sys/stat.h>
-#include <direct.h>
 
 int nob_cli_main(int argc, char **argv)
 {
@@ -28,6 +27,15 @@ int nob_cli_main(int argc, char **argv)
             // TODO: an ability to set the target through the `config` command
             while (argc > 0) {
                 const char *flag_name = shift(argv, argc);
+                if (strcmp(flag_name, "target") == 0) {
+                    if (argc == 0) {
+                        nob_log(NOB_ERROR, "Expected target name after `target`");
+                        return 1;
+                    }
+                    const char *target_name = shift(argv, argc);
+                    if (!config_set_target(target_name)) return 1;
+                    continue;
+                }
                 bool found = false;
                 for (size_t i = 0; !found && i < ARRAY_LEN(feature_flags); ++i) {
                     if (strcmp(feature_flags[i].name, flag_name) == 0) {
@@ -139,8 +147,9 @@ int nob_cli_main(int argc, char **argv)
 
                 // Start Vite dev server in background
                 if (!run_npm_command("run dev", true)) return 1;
-                // Modify MainActivity for dev
-                if (!replace_all_in_file(main_activity_path, "webView.loadUrl(\"https://appassets.androidplatform.net/index.html\")", "webView.loadUrl(\"http://localhost:5173\")")) return 1;
+                if (!mkdir_if_not_exists("android/app/src/main/assets")) return 1;
+                if (!write_entire_file("android/app/src/main/assets/dev-url.txt", "http://127.0.0.1:5173\n", strlen("http://127.0.0.1:5173\n"))) return 1;
+                (void)main_activity_path;
                 // Build debug APK
                 Cmd cmd = {0};
                 cmd_append(&cmd, "cmd");
@@ -228,7 +237,7 @@ int nob_cli_main(int argc, char **argv)
         } else if (strcmp(command_name, "help") == 0) {
             nob_log(INFO, "Usage: %s [command]", program);
             nob_log(INFO, "Commands:");
-            nob_log(INFO, "    config");
+            nob_log(INFO, "    config [hotreload] [unbundle] [webview-debug] [target <name>]");
             nob_log(INFO, "    init");
             nob_log(INFO, "    dev");
             nob_log(INFO, "    build");

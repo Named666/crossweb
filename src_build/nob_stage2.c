@@ -42,19 +42,19 @@ int main(int argc, char **argv)
     nob_log(NOB_INFO, "--- STAGE 2 ---");
     // log_config(NOB_INFO);
     if (!build_dist()) return 1;
-#ifdef CROSSWEB_HOTRELOAD
-#ifdef _WIN32
+#if CROSSWEB_HOTRELOAD && defined(_WIN32) && defined(CROSSWEB_TARGET_WIN64_GCC)
     HWND hwnd = FindWindowA(NULL, "Crossweb");
     if (hwnd != NULL) {
         nob_log(NOB_INFO, "App already running, updated plugin DLL for hotreload");
         return 0;
     }
-#endif
     {
         Cmd run_cmd = {0};
         cmd_append(&run_cmd, "./build/crossweb");
         if (!cmd_run(&run_cmd)) return 1;
     }
+#elif CROSSWEB_HOTRELOAD
+    nob_log(NOB_INFO, "Hot reload launch is implemented for the Windows host only; the binary was not started");
 #endif
 
     return 0;

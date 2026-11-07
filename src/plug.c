@@ -24,18 +24,44 @@ extern void android_emit(const char *event, const char *data);
 static Plugin *registered_plugins[MAX_PLUGINS];
 static int plugin_count = 0;
 
+#define PLUG_GRANT_CAP 128
+typedef struct PlugGrant {
+    char plugin[PLUG_NAME_CAP];
+    char command[PLUG_NAME_CAP];
+} PlugGrant;
+static PlugGrant grants[PLUG_GRANT_CAP];
+static int grant_count = 0;
+
 static void (*host_emit_event)(const char *event, const char *data_json) = NULL;
 
+static bool plug_token_ok(const char *s) {
+    if (s == NULL || s[0] == '\0') return false;
+    size_t n = 0;
+    for (const unsigned char *p = (const unsigned char *)s; *p; ++p) {
+        unsigned char c = *p;
+        int ok = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
+                 (c >= '0' && c <= '9') || c == '_' || c == '-';
+        if (!ok) return false;
+        n++;
+        if (n >= PLUG_NAME_CAP) return false;
+    }
+    return true;
+}
+
+static void plug_respond_err(RespondCallback respond, const char *json) {
+    if (respond) respond(json);
+}
+
 void plug_register(Plugin *plugin) {
-    if (plugin == NULL) {
-        fprintf(stderr, "plug_register: NULL plugin\n");
+    if (plugin == NULL || !plug_token_ok(plugin->name)) {
+        fprintf(stderr, "plug_register: rejected plugin with a missing or invalid name\n");
         return;
     }
     if (plugin_count < MAX_PLUGINS) {
         // Check for duplicate registration (can happen with hotreload)
         for (int i = 0; i < plugin_count; ++i) {
             if (registered_plugins[i] == plugin ||
-                (registered_plugins[i]->name && plugin->name &&
+                (registered_plugins[i]->name &&
                  strcmp(registered_plugins[i]->name, plugin->name) == 0)) {
                 return; // Already registered
             }
@@ -45,6 +71,89 @@ void plug_register(Plugin *plugin) {
     } else {
         fprintf(stderr, "Maximum number of plugins reached\n");
     }
+}
+
+bool plug_has(const char *name) {
+    if (name == NULL) return false;
+    for (int i = 0; i < plugin_count; ++i) {
+        if (registered_plugins[i]->name &&
+            strcmp(registered_plugins[i]->name, name) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool plug_grant(const char *plugin, const char *command) {
+    if (!plug_token_ok(plugin) || !plug_token_ok(command)) return false;
+    for (int i = 0; i < grant_count; ++i) {
+        if (strcmp(grants[i].plugin, plugin) == 0 &&
+            strcmp(grants[i].command, command) == 0) {
+            return true;
+        }
+    }
+    if (grant_count >= PLUG_GRANT_CAP) return false;
+    memcpy(grants[grant_count].plugin, plugin, strlen(plugin) + 1);
+    memcpy(grants[grant_count].command, command, strlen(command) + 1);
+    grant_count++;
+    return true;
+}
+
+void plug_revoke_all(void) {
+    grant_count = 0;
+}
+
+bool plug_is_allowed(const char *plugin, const char *command) {
+    if (plugin == NULL || command == NULL) return false;
+    for (int i = 0; i < grant_count; ++i) {
+        if (strcmp(grants[i].plugin, plugin) == 0 &&
+            strcmp(grants[i].command, command) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool plug_load_grants(const char *path) {
+    if (path == NULL) return false;
+    FILE *f = fopen(path, "rb");
+    if (f == NULL) return false;
+
+    int saved = grant_count;
+    bool ok = true;
+    char line[512];
+    while (fgets(line, (int)sizeof(line), f) != NULL) {
+        size_t n = strlen(line);
+        if (n == sizeof(line) - 1 && line[n - 1] != '\n') {
+            ok = false;
+            break;
+        }
+        while (n > 0 && (line[n - 1] == '\n' || line[n - 1] == '\r')) {
+            line[--n] = '\0';
+        }
+        if (n == 0 || line[0] == '#') continue;
+        if (strchr(line, ' ') != NULL || strchr(line, '\t') != NULL) {
+            ok = false;
+            break;
+        }
+        char *dot = strchr(line, '.');
+        if (dot == NULL || dot == line || strchr(dot + 1, '.') != NULL) {
+            ok = false;
+            break;
+        }
+        *dot = '\0';
+        if (!plug_grant(line, dot + 1)) {
+            ok = false;
+            break;
+        }
+    }
+    if (ferror(f)) ok = false;
+    fclose(f);
+    if (!ok) {
+        grant_count = saved;
+        return false;
+    }
+    return true;
 }
 
 
@@ -85,29 +194,50 @@ CROSSWEB_API void plug_init(webview_t wv) {
 }
 
 CROSSWEB_API void plug_invoke(const char *cmd, const char *payload, RespondCallback respond) {
-    fprintf(stderr, "plug_invoke: cmd=%s payload=%s\n", cmd ? cmd : "NULL", payload ? payload : "NULL");
-    // Parse cmd, e.g., "fs.read" -> plugin "fs", subcmd "read"
-    char *dot = strchr(cmd, '.');
-    if (!dot) {
-        if (respond) respond("{\"error\":\"invalid command format\"}");
+    // Untrusted web content reaches plugins only through this function.
+    // Commands are denied unless the host granted that exact plugin.command.
+    if (cmd == NULL) {
+        plug_respond_err(respond, "{\"ok\":false,\"error\":\"invalid command format\"}");
         return;
     }
-    size_t plugin_len = dot - cmd;
-    char plugin_name[256];
-    strncpy(plugin_name, cmd, plugin_len);
+    const char *dot = strchr(cmd, '.');
+    if (dot == NULL || dot == cmd || strchr(dot + 1, '.') != NULL) {
+        plug_respond_err(respond, "{\"ok\":false,\"error\":\"invalid command format\"}");
+        return;
+    }
+    size_t plugin_len = (size_t)(dot - cmd);
+    size_t sub_len = strlen(dot + 1);
+    if (plugin_len == 0 || plugin_len >= PLUG_NAME_CAP || sub_len == 0 || sub_len >= PLUG_NAME_CAP) {
+        plug_respond_err(respond, "{\"ok\":false,\"error\":\"invalid command format\"}");
+        return;
+    }
+    char plugin_name[PLUG_NAME_CAP];
+    char subcmd[PLUG_NAME_CAP];
+    memcpy(plugin_name, cmd, plugin_len);
     plugin_name[plugin_len] = '\0';
-    const char *subcmd = dot + 1;
+    memcpy(subcmd, dot + 1, sub_len + 1);
+    if (!plug_token_ok(plugin_name) || !plug_token_ok(subcmd)) {
+        plug_respond_err(respond, "{\"ok\":false,\"error\":\"invalid command format\"}");
+        return;
+    }
+    if (!plug_is_allowed(plugin_name, subcmd)) {
+        fprintf(stderr, "plug_invoke: denied %s.%s\n", plugin_name, subcmd);
+        plug_respond_err(respond, "{\"ok\":false,\"error\":\"permission denied\"}");
+        return;
+    }
 
     for (int i = 0; i < plugin_count; ++i) {
         Plugin *p = registered_plugins[i];
-        if (strcmp(p->name, plugin_name) == 0) {
+        if (p->name && strcmp(p->name, plugin_name) == 0) {
             if (p->invoke) {
-                p->invoke(subcmd, payload, respond);
+                p->invoke(subcmd, payload ? payload : "", respond);
+            } else {
+                plug_respond_err(respond, "{\"ok\":false,\"error\":\"plugin has no invoke\"}");
             }
             return;
         }
     }
-    if (respond) respond("{\"error\":\"unknown plugin\"}");
+    plug_respond_err(respond, "{\"ok\":false,\"error\":\"unknown plugin\"}");
 }
 
 CROSSWEB_API void plug_emit(const char *event, const char *data) {
@@ -118,6 +248,9 @@ CROSSWEB_API void plug_emit(const char *event, const char *data) {
     if (event && host_emit_event) {
         host_emit_event(event, data ? data : "null");
     }
+#else
+    (void)event;
+    (void)data;
 #endif
 }
 
@@ -153,7 +286,7 @@ void plug_free_resource(void *data) {
     // Stub
 }
 
-#ifndef CROSSWEB_HOTRELOAD
+#if !CROSSWEB_HOTRELOAD
 bool reload_libplug(void) { return true; }
 bool reload_libplug_changed(void) { return false; }
 #endif // CROSSWEB_HOTRELOAD

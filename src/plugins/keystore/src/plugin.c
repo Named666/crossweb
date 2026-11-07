@@ -618,7 +618,11 @@ static bool keystore_invoke(const char *cmd, const char *payload, RespondCallbac
     respond("{\"ok\":false,\"msg\":\"Unknown command\"}");
     return false;
 #else
-    respond("{\"ok\":false,\"msg\":\"Keystore not supported on this platform\"}");
+    (void)cmd;
+    (void)payload;
+    if (respond) {
+        respond("{\"ok\":false,\"msg\":\"Keystore not supported on this platform\"}");
+    }
     return false;
 #endif
 }

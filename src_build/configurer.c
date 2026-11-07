@@ -13,13 +13,19 @@ static Feature_Flag feature_flags[] = {
     {
         .macro = "CROSSWEB_HOTRELOAD",
         .name = "hotreload",
-        .description = "Moves everything in src/plug.c to a separate \"DLL\" so it can be hotreloaded.",
-        .enabled_by_default = true,
+        .description = "Moves the plugin runtime to a shared library so it can be reloaded. Opt-in.",
+        .enabled_by_default = false,
     },
     {
         .macro = "CROSSWEB_UNBUNDLE",
         .name = "unbundle",
         .description = "Don't bundle resources/ folder with the executable and load the resources directly from the folder.",
+        .enabled_by_default = false,
+    },
+    {
+        .macro = "CROSSWEB_WEBVIEW_DEBUG",
+        .name = "webview-debug",
+        .description = "Enable WebView remote debugging. Off unless explicitly configured.",
         .enabled_by_default = false,
     },
 };
@@ -34,7 +40,7 @@ static Target_Flag target_flags[] = {
     {
         .macro = "CROSSWEB_TARGET_WIN64_GCC",
         .name = "win64-gcc",
-        .enabled_by_default = true,
+        .enabled_by_default = false,
     },
     {
         .macro = "CROSSWEB_TARGET_LINUX",
@@ -63,6 +69,51 @@ static Target_Flag target_flags[] = {
     },
 };
 
+static bool target_overridden = false;
+
+static void select_host_target_if_needed(void)
+{
+    if (target_overridden) return;
+#if defined(_WIN32)
+    const char *host = "win64-gcc";
+#elif defined(__linux__)
+    const char *host = "linux";
+#else
+    const char *host = NULL;
+#endif
+    for (size_t i = 0; i < NOB_ARRAY_LEN(target_flags); ++i) {
+        target_flags[i].enabled_by_default = host != NULL && strcmp(target_flags[i].name, host) == 0;
+    }
+    if (host == NULL) {
+        nob_log(NOB_WARNING, "No host target detected; config will not enable a target");
+    }
+}
+
+bool config_set_target(const char *name)
+{
+    if (name == NULL || name[0] == '\0') {
+        nob_log(NOB_ERROR, "Expected a target name");
+        return false;
+    }
+    if (strcmp(name, "macos") == 0 || strcmp(name, "ios") == 0 || strcmp(name, "openbsd") == 0) {
+        nob_log(NOB_ERROR, "Target `%s` is deferred. Use linux, win64-gcc, or android.", name);
+        return false;
+    }
+    bool found = false;
+    for (size_t i = 0; i < NOB_ARRAY_LEN(target_flags); ++i) {
+        bool match = strcmp(target_flags[i].name, name) == 0;
+        if (match) found = true;
+        target_flags[i].enabled_by_default = match;
+    }
+    if (!found) {
+        nob_log(NOB_ERROR, "Unknown target `%s`", name);
+        nob_log(NOB_ERROR, "Known targets: win64-gcc, linux, macos, openbsd, android, ios");
+        return false;
+    }
+    target_overridden = true;
+    return true;
+}
+
 #define genf(out, ...) \
     do { \
         fprintf((out), __VA_ARGS__); \
@@ -78,6 +129,10 @@ bool generate_default_config(const char *file_path)
         return false;
     }
 
+    select_host_target_if_needed();
+
+    fprintf(f, "#ifndef CROSSWEB_CONFIG_H_\n");
+    fprintf(f, "#define CROSSWEB_CONFIG_H_\n\n");
     fprintf(f, "//// Feature flags\n");
     for (size_t i = 0; i < NOB_ARRAY_LEN(feature_flags); ++i) {
         Feature_Flag flag = feature_flags[i];
@@ -110,6 +165,7 @@ bool generate_default_config(const char *file_path)
         da_free(plugins);
     }
 
+    fprintf(f, "\n#endif // CROSSWEB_CONFIG_H_\n");
     fclose(f);
     return true;
 }

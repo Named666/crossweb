@@ -12,6 +12,7 @@
 
 // Check if a file should be excluded based on platform
 static bool should_exclude_file(const char *filename, PluginPlatform platform) {
+    (void)platform;
     // Skip non-C files
     size_t len = strlen(filename);
     if (len < 3 || strcmp(filename + len - 2, ".c") != 0) {

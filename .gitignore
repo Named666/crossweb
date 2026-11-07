@@ -1,5 +1,5 @@
-# Android folder for testing. Ignoring
-android/
+# Generated Android project. The template under templates/android stays tracked.
+/android/
 
 # Musializer output
 *.mp4

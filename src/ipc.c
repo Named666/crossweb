@@ -6,15 +6,12 @@
 #include <stdlib.h>
 #include <string.h>
 
-#ifdef _WIN32
-#ifndef CROSSWEB_BUILDING_PLUG
-#include "./thirdparty/webview-c/webview.h"
-#endif
-#endif
-
 #ifdef __ANDROID__
 extern void android_response(const char *id, const char *response_json);
 #endif
+
+static IpcEvalFn ipc_eval_fn = NULL;
+static void *ipc_eval_userdata = NULL;
 
 #define IPC_QUEUE_CAP 64
 #define IPC_SEPARATOR '\x1e'
@@ -38,6 +35,20 @@ static bool ipc_queue_push(const IpcMessage *msg) {
     queue[queue_tail] = *msg;
     queue_tail = (queue_tail + 1) % IPC_QUEUE_CAP;
     queue_count++;
+    return true;
+}
+
+bool ipc_identifier_ok(const char *value, size_t max_len) {
+    if (value == NULL || value[0] == '\0' || max_len < 2) return false;
+    size_t n = 0;
+    for (const unsigned char *p = (const unsigned char *)value; *p; ++p) {
+        unsigned char c = *p;
+        int ok = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
+                 (c >= '0' && c <= '9') || c == '.' || c == '_' || c == ':' || c == '-';
+        if (!ok) return false;
+        n++;
+        if (n >= max_len) return false;
+    }
     return true;
 }
 
@@ -105,65 +116,19 @@ static bool base64_decode(const char *input, unsigned char *output, size_t outpu
     return true;
 }
 
-#ifdef _WIN32
-static bool ipc_eval_js(const char *script) {
-    if (active_webview == NULL || script == NULL) {
-        return false;
-    }
-    struct webview *wv = (struct webview *)active_webview;
-    if (webview_eval(wv, script) != 0) {
-        fprintf(stderr, "IPC: failed to evaluate bridge JS\n");
-        return false;
-    }
-    return true;
+void ipc_set_eval(IpcEvalFn fn, void *userdata) {
+    ipc_eval_fn = fn;
+    ipc_eval_userdata = userdata;
 }
 
 void ipc_inject_bridge(void) {
-    static const char *bridge_js =
-        "(function(){"
-        "var SEP=String.fromCharCode(30);"
-        "function encodePayload(value){"
-        "  if(value===undefined||value===null){return '';}"
-        "  var text=(typeof value==='string')?value:JSON.stringify(value);"
-        "  if(window.TextEncoder){"
-        "    var bytes=new TextEncoder().encode(text);"
-        "    var bin='';"
-        "    for(var i=0;i<bytes.length;i++){bin+=String.fromCharCode(bytes[i]);}"
-        "    return btoa(bin);"
-        "  }"
-        "  return btoa(unescape(encodeURIComponent(text)));"
-        "}"
-        "function install(){"
-        "  if(window.external&&window.external.__bridgeInstalled){return;}"
-        "  window.external=window.external||{};"
-        "  var nativeInvoke=window.external.invoke;"
-        "  window.external.__bridgeInstalled=true;"
-        "  window.external.invoke=function(cmd,payload){"
-        "    var id=Math.random().toString(36).slice(2)+Date.now().toString(36);"
-        "    var normalized=(payload===undefined||payload===null)?'':(typeof payload==='string'?payload:JSON.stringify(payload));"
-        "    var encoded=encodePayload(normalized);"
-        "    if(typeof nativeInvoke==='function'){nativeInvoke(id+SEP+String(cmd||'')+SEP+encoded);}"
-        "    return id;"
-        "  };"
-        "  window.external.listen=function(cb){window.external.onEvent=cb;};"
-        "}"
-        "if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',install);}"
-        "else{install();}"
-        "})();";
-    ipc_eval_js(bridge_js);
+    /* Hosts install their own bridge. The old webview-c injector depended on a
+       missing third-party header and is not used by the system WebView shells. */
 }
-#endif
 
 void ipc_init(webview_t wv) {
     active_webview = wv;
     ipc_queue_clear();
-#ifdef _WIN32
-    if (wv != NULL) {
-        ipc_inject_bridge();
-    }
-#else
-    (void)wv;
-#endif
 }
 
 bool ipc_receive(IpcMessage *msg) {
@@ -221,6 +186,10 @@ bool ipc_handle_js_message(const char *message) {
     memcpy(msg.cmd, first + 1, cmd_len);
     msg.cmd[cmd_len] = '\0';
 
+    if (!ipc_identifier_ok(msg.id, IPC_MAX_ID_LEN) || !ipc_identifier_ok(msg.cmd, IPC_MAX_CMD_LEN)) {
+        return false;
+    }
+
     if (!decode_payload_field(second + 1, msg.payload, sizeof(msg.payload))) {
         fprintf(stderr, "IPC: failed to decode payload for %s\n", msg.cmd);
         ipc_response(msg.id, "{\"ok\":false,\"error\":\"invalid payload\"}");
@@ -251,74 +220,46 @@ static char *build_dispatch_script(const char *format, const char *id, const cha
     return buffer;
 }
 
+static void ipc_eval_encoded(const char *token, const char *json, const char *tmpl) {
+    if (ipc_eval_fn == NULL || json == NULL) {
+        return;
+    }
+    size_t len = strlen(json);
+    size_t encoded_cap = ((len + 2) / 3) * 4 + 4;
+    char *encoded = (char *)malloc(encoded_cap);
+    if (encoded == NULL) {
+        return;
+    }
+    if (!base64_encode((const unsigned char *)json, len, encoded, encoded_cap)) {
+        free(encoded);
+        return;
+    }
+    char *script = build_dispatch_script(tmpl, token, encoded);
+    free(encoded);
+    if (script != NULL) {
+        ipc_eval_fn(script, ipc_eval_userdata);
+        free(script);
+    }
+}
+
 void ipc_response(const char *id, const char *response_json) {
-    if (id == NULL || id[0] == '\0' || response_json == NULL) {
+    if (!ipc_identifier_ok(id, IPC_MAX_ID_LEN) || response_json == NULL) {
         return;
     }
 #ifdef __ANDROID__
     android_response(id, response_json);
-#elif defined(_WIN32)
-    size_t resp_len = strlen(response_json);
-    size_t encoded_cap = ((resp_len + 2) / 3) * 4 + 4;
-    char *encoded = (char *)malloc(encoded_cap);
-    if (encoded == NULL) {
-        return;
-    }
-    if (!base64_encode((const unsigned char *)response_json, resp_len, encoded, encoded_cap)) {
-        free(encoded);
-        return;
-    }
-    static const char *tmpl =
-        "if(window.external&&window.external.onMessage){window.external.onMessage(\"%s\",JSON.parse(atob(\"%s\")));}";
-    char *script = build_dispatch_script(tmpl, id, encoded);
-    free(encoded);
-    if (script != NULL) {
-        ipc_eval_js(script);
-        free(script);
-    }
 #else
-    (void)id;
-    (void)response_json;
+    ipc_eval_encoded(id, response_json,
+        "if(window.external&&window.external.onMessage){window.external.onMessage(\"%s\",JSON.parse(atob(\"%s\")));}");
 #endif
 }
 
 void ipc_emit_event(const char *event, const char *data_json) {
-    if (event == NULL || event[0] == '\0' || data_json == NULL) {
+    if (!ipc_identifier_ok(event, IPC_MAX_CMD_LEN) || data_json == NULL) {
         return;
     }
-#ifdef _WIN32
-    size_t data_len = strlen(data_json);
-    size_t encoded_cap = ((data_len + 2) / 3) * 4 + 4;
-    char *encoded = (char *)malloc(encoded_cap);
-    if (encoded == NULL) {
-        return;
-    }
-    if (!base64_encode((const unsigned char *)data_json, data_len, encoded, encoded_cap)) {
-        free(encoded);
-        return;
-    }
-    int needed = snprintf(NULL, 0,
-        "if(window.external&&window.external.onEvent){window.external.onEvent(\"%s\",JSON.parse(atob(\"%s\")));}",
-        event, encoded);
-    if (needed <= 0) {
-        free(encoded);
-        return;
-    }
-    char *script = (char *)malloc((size_t)needed + 1);
-    if (script == NULL) {
-        free(encoded);
-        return;
-    }
-    snprintf(script, (size_t)needed + 1,
-        "if(window.external&&window.external.onEvent){window.external.onEvent(\"%s\",JSON.parse(atob(\"%s\")));}",
-        event, encoded);
-    free(encoded);
-    ipc_eval_js(script);
-    free(script);
-#else
-    (void)event;
-    (void)data_json;
-#endif
+    ipc_eval_encoded(event, data_json,
+        "if(window.external&&window.external.onEvent){window.external.onEvent(\"%s\",JSON.parse(atob(\"%s\")));}");
 }
 
 void ipc_deinit(void) {
