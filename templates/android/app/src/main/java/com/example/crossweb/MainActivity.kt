@@ -96,7 +96,7 @@ class MainActivity : AppCompatActivity() {
             };
         """, null)
 
-        // Load the local HTML file from assets folder via asset loader
+        // Development builds replace this URL with the local Vite server.
         webView.loadUrl("https://appassets.androidplatform.net/index.html")
     }
 

@@ -1,0 +1,13 @@
+{
+  "command": "dialog.open",
+  "payload": {
+    "title": "Open file",
+    "message": "Choose a file to continue"
+  },
+  "response": {
+    "ok": true,
+    "data": {
+      "path": "/tmp/example.txt"
+    }
+  }
+}

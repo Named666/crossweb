@@ -40,17 +40,15 @@ static void host_emit_event(const char *event, const char *data_json) {
     ipc_emit_event(event, data_json ? data_json : "null");
 }
 
-static void process_ipc_queue(webview_t wv) {
-    IpcMessage msg;
-    while (ipc_receive(&msg)) {
-        char previous_id[IPC_MAX_ID_LEN];
-        memcpy(previous_id, pending_invoke_id, sizeof(previous_id));
-        strncpy(pending_invoke_id, msg.id, sizeof(pending_invoke_id) - 1);
-        pending_invoke_id[sizeof(pending_invoke_id) - 1] = '\0';
-        plug_invoke(msg.cmd, msg.payload, respond_to_js);
-        memcpy(pending_invoke_id, previous_id, sizeof(pending_invoke_id));
-    }
-    (void)wv;
+// Platform callbacks used by ipc core to set/clear the per-invoke id context
+static void platform_set_pending_id_fn(const char *id) {
+    if (!id) return;
+    strncpy(pending_invoke_id, id, IPC_MAX_ID_LEN - 1);
+    pending_invoke_id[IPC_MAX_ID_LEN - 1] = '\0';
+}
+
+static void platform_clear_pending_id_fn(void) {
+    pending_invoke_id[0] = '\0';
 }
 
 static bool file_exists(const char *path) {
@@ -117,9 +115,8 @@ static bool resolve_start_url(void) {
 
 static void handle_external_invoke(struct webview *wv, const char *arg) {
     (void)wv;
-    if (!ipc_handle_js_message(arg)) {
-        fprintf(stderr, "IPC: dropped malformed message\n");
-    }
+    // Thin host callback: route untrusted input through centralized IPC validation.
+    ipc_route_external_message("webview", arg, respond_to_js);
 }
 
 static void on_webview_ready(struct webview *wv) {
@@ -164,6 +161,8 @@ int main(void) {
     }
 
     ipc_init((webview_t)&wv);
+    // Register functions that set/clear the pending invoke id used by respond_to_js
+    ipc_register_platform_response_fns(platform_set_pending_id_fn, platform_clear_pending_id_fn);
     plug_init((webview_t)&wv);
 
     bool running = true;
@@ -183,7 +182,7 @@ int main(void) {
             }
         }
 #endif
-        process_ipc_queue((webview_t)&wv);
+        ipc_process_queue();
         plug_update((webview_t)&wv);
     }
     plug_cleanup((webview_t)&wv);

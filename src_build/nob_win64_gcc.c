@@ -22,7 +22,9 @@ bool build_dist(void)
     cmd_append(&cmd, "gcc");
     cmd_append(&cmd, "-Wall", "-Wextra", "-ggdb");
     cmd_append(&cmd, "-I.");
-    cmd_append(&cmd, "-include", "build/config.h");
+    cmd_append(&cmd, "-I", "src_build");
+    cmd_append(&cmd, "-I", "thirdparty");
+    append_build_defines(&cmd);
     cmd_append(&cmd, "-DCROSSWEB_BUILDING_PLUG=1");
     cmd_append(&cmd, "-DWEBVIEW_WINAPI");
     cmd_append(&cmd, "-fPIC", "-shared");
@@ -46,17 +48,22 @@ bool build_dist(void)
     if (!cmd_run(&cmd)) return_defer(false);
 
     cmd_append(&cmd, "gcc");
-    cmd_append(&cmd, "-Wall", "-Wextra", "-ggdb");
+    cmd_append(&cmd, "-Wall", "-Wextra", "-ggdb", "-Wno-unused-parameter", "-Wno-format", "-Wunknown-pragmas", "-Wunused-function", "-Wunused-variable");
     cmd_append(&cmd, "-I.");
-    cmd_append(&cmd, "-include", "build/config.h");
+    cmd_append(&cmd, "-I", "src_build");
+    cmd_append(&cmd, "-I", "thirdparty");
+    append_build_defines(&cmd);
     cmd_append(&cmd, "-DWEBVIEW_WINAPI");
-    cmd_append(&cmd, "-I", "./thirdparty/webview-c/ms.webview2/include");
+    cmd_append(&cmd, "-isystem", "thirdparty/webview-c/ms.webview2/include");
     cmd_append(&cmd, "-Wno-implicit-function-declaration");
     cmd_append(&cmd, "-o", "./build/crossweb");
     cmd_append(&cmd,
         "./src/webview.c",
         "./src/ipc.c",
-        "./src/hotreload_windows.c");
+        "./src/hotreload_windows.c",
+        "./src_build/nob_impl.c",
+        "./src_build/common.c",
+        "./src_build/plugins.c");
     cmd_append(&cmd, "-lole32", "-lcomctl32", "-loleaut32", "-luuid", "-lgdi32", "-ladvapi32");
     
     // Add plugin-specific libraries
@@ -90,9 +97,11 @@ bool build_dist(void)
     cmd_append(&cmd, "gcc");
     cmd_append(&cmd, "-Wall", "-Wextra", "-ggdb");
     cmd_append(&cmd, "-I.");
-    cmd_append(&cmd, "-include", "build/config.h");
+    cmd_append(&cmd, "-I", "src_build");
+    cmd_append(&cmd, "-I", "thirdparty");
+    append_build_defines(&cmd);
     cmd_append(&cmd, "-DWEBVIEW_WINAPI=1");
-    cmd_append(&cmd, "-I", "./thirdparty/webview-c/ms.webview2/include");
+    cmd_append(&cmd, "-isystem", "thirdparty/webview-c/ms.webview2/include");
     cmd_append(&cmd, "-o", "./build/crossweb");
     cmd_append(&cmd, "./src/plug.c", "./src/ipc.c", "./src/webview.c");
     

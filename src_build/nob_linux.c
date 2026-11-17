@@ -18,7 +18,7 @@ bool build_dist(void)
     cmd_append(&cmd, "cc");
     cmd_append(&cmd, "-Wall", "-Wextra", "-ggdb");
     cmd_append(&cmd, "-I.");
-    cmd_append(&cmd, "-include", "build/config.h");
+    append_build_defines(&cmd);
     cmd_append(&cmd, "-DCROSSWEB_BUILDING_PLUG=1");
     cmd_append(&cmd, "-fPIC", "-shared");
     cmd_append(&cmd, "-o", "./build/libplug.so");
@@ -35,7 +35,7 @@ bool build_dist(void)
     cmd_append(&cmd, "cc");
     cmd_append(&cmd, "-Wall", "-Wextra", "-ggdb");
     cmd_append(&cmd, "-I.");
-    cmd_append(&cmd, "-include", "build/config.h");
+    append_build_defines(&cmd);
     cmd_append(&cmd, "-o", "./build/crossweb");
     cmd_append(&cmd, "./src/webview.c", "./src/hotreload_posix.c");
     cmd_append(&cmd, "-Wl,-rpath=./build/", "-Wl,-rpath=./");
@@ -46,7 +46,7 @@ bool build_dist(void)
     cmd_append(&cmd, "cc");
     cmd_append(&cmd, "-Wall", "-Wextra", "-ggdb");
     cmd_append(&cmd, "-I.");
-    cmd_append(&cmd, "-include", "build/config.h");
+    append_build_defines(&cmd);
     cmd_append(&cmd, "-o", "./build/crossweb");
     cmd_append(&cmd, "./src/plug.c", "./src/ipc.c", "./src/webview.c");
     

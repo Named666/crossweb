@@ -1,4 +1,17 @@
 #include "common.h"
+
+bool cli_hotreload_enabled = true;
+int cli_argc = 0;
+char **cli_argv = NULL;
+/* Ensure the nob header exposes the stripped-prefix typedefs used throughout
+    this file when compiled as a separate translation unit. Do NOT define
+    NOB_IMPLEMENTATION here. */
+#ifndef NOB_STRIP_PREFIX
+#define NOB_STRIP_PREFIX
+#endif
+#ifndef NOB_H_
+#include "../thirdparty/nob.h"
+#endif
 #include <string.h>
 #include <stdlib.h>
 #include <sys/stat.h>
@@ -37,16 +50,49 @@ bool validate_android_init(void) {
 }
 
 bool is_plugin_enabled(const char *plugin_name) {
-    String_Builder content = {0};
-    if (!read_entire_file("build/config.h", &content)) return true;
-    char macro[256];
-    sprintf(macro, "#define CROSSWEB_PLUGIN_%s 1", plugin_name);
-    for (size_t j = strlen("#define CROSSWEB_PLUGIN_"); j < strlen(macro); ++j) {
-        macro[j] = toupper(macro[j]);
+    (void)plugin_name;
+    return true;
+}
+
+void append_build_defines(Cmd *cmd) {
+#ifdef CROSSWEB_HOTRELOAD
+    cmd_append(cmd, "-DCROSSWEB_HOTRELOAD=1");
+#endif
+#ifdef CROSSWEB_UNBUNDLE
+    cmd_append(cmd, "-DCROSSWEB_UNBUNDLE=1");
+#endif
+#ifdef CROSSWEB_TARGET_WIN64_GCC
+    cmd_append(cmd, "-DCROSSWEB_TARGET_WIN64_GCC=1");
+#endif
+#ifdef CROSSWEB_TARGET_LINUX
+    cmd_append(cmd, "-DCROSSWEB_TARGET_LINUX=1");
+#endif
+#ifdef CROSSWEB_TARGET_MACOS
+    cmd_append(cmd, "-DCROSSWEB_TARGET_MACOS=1");
+#endif
+#ifdef CROSSWEB_TARGET_OPENBSD
+    cmd_append(cmd, "-DCROSSWEB_TARGET_OPENBSD=1");
+#endif
+#ifdef CROSSWEB_TARGET_ANDROID
+    cmd_append(cmd, "-DCROSSWEB_TARGET_ANDROID=1");
+#endif
+    Nob_File_Paths plugins = {0};
+    if (!nob_read_entire_dir("src/plugins", &plugins)) return;
+    for (size_t i = 0; i < plugins.count; ++i) {
+        const char *plugin_name = plugins.items[i];
+        if (strcmp(plugin_name, ".") == 0 || strcmp(plugin_name, "..") == 0) continue;
+        char macro[256];
+        snprintf(macro, sizeof(macro), "-DCROSSWEB_PLUGIN_%s=1", plugin_name);
+        for (size_t j = strlen("-DCROSSWEB_PLUGIN_"); j < strlen(macro); ++j) {
+            macro[j] = (char)toupper((unsigned char)macro[j]);
+        }
+        cmd_append(cmd, nob_temp_strdup(macro));
     }
-    bool enabled = strstr(content.items, macro) != NULL;
-    da_free(content);
-    return enabled;
+    da_free(plugins);
+}
+
+void append_cli_hotreload_define(Cmd *cmd) {
+    if (cli_hotreload_enabled) cmd_append(cmd, "-DCROSSWEB_HOTRELOAD=1");
 }
 
 bool is_dir(const char *path) {
@@ -146,25 +192,20 @@ void slash_package_name(char *slashed, const char *package_name) {
 }
 
 bool run_npm_command(const char *npm_cmd, bool background) {
+    char shell_cmd[2048];
+    snprintf(shell_cmd, sizeof(shell_cmd), "cd /d web && npm %s", npm_cmd);
+
     Cmd cmd = {0};
     cmd_append(&cmd, "cmd");
     cmd_append(&cmd, "/c");
     if (background) {
         cmd_append(&cmd, "start");
+        cmd_append(&cmd, "\"\"");
         cmd_append(&cmd, "cmd");
         cmd_append(&cmd, "/c");
-    }
-    cmd_append(&cmd, "cd");
-    cmd_append(&cmd, "web");
-    cmd_append(&cmd, "&&");
-    cmd_append(&cmd, "npm");
-    // Split npm_cmd by spaces and add each part
-    char cmd_copy[1024];
-    strcpy(cmd_copy, npm_cmd);
-    char *token = strtok(cmd_copy, " ");
-    while (token) {
-        cmd_append(&cmd, token);
-        token = strtok(NULL, " ");
+        cmd_append(&cmd, shell_cmd);
+    } else {
+        cmd_append(&cmd, shell_cmd);
     }
     bool result = cmd_run(&cmd);
     cmd_free(cmd);
@@ -187,7 +228,7 @@ bool run_android_emulator(const char *avd_name, int wait_seconds) {
     cmd_append(&cmd, "-gpu");
     cmd_append(&cmd, "off");
     if (!cmd_run_async(cmd)) return false; // Run in background
-    // Wait for emulator
+    // Give emulator process time to start.
     cmd = (Cmd){0};
     cmd_append(&cmd, "cmd");
     cmd_append(&cmd, "/c");
@@ -195,6 +236,42 @@ bool run_android_emulator(const char *avd_name, int wait_seconds) {
     char timeout_str[16];
     sprintf(timeout_str, "%d", wait_seconds);
     cmd_append(&cmd, timeout_str);
-    cmd_run(&cmd);
-    return true;
+    cmd_append(&cmd, "/nobreak");
+    if (!cmd_run(&cmd)) return false;
+
+    // Wait for adb to detect a connected device.
+    cmd = (Cmd){0};
+    cmd_append(&cmd, "adb");
+    cmd_append(&cmd, "wait-for-device");
+    if (!cmd_run(&cmd)) return false;
+
+    // Poll until Android reports boot complete.
+    for (int i = 0; i < 180; ++i) {
+        cmd = (Cmd){0};
+        cmd_append(&cmd, "cmd");
+        cmd_append(&cmd, "/c");
+        cmd_append(&cmd, "adb");
+        cmd_append(&cmd, "shell");
+        cmd_append(&cmd, "getprop");
+        cmd_append(&cmd, "sys.boot_completed");
+        cmd_append(&cmd, "|");
+        cmd_append(&cmd, "findstr");
+        cmd_append(&cmd, "/R");
+        cmd_append(&cmd, "^1$");
+        if (cmd_run(&cmd)) {
+            nob_log(NOB_INFO, "Android emulator is ready");
+            return true;
+        }
+
+        cmd = (Cmd){0};
+        cmd_append(&cmd, "cmd");
+        cmd_append(&cmd, "/c");
+        cmd_append(&cmd, "timeout");
+        cmd_append(&cmd, "1");
+        cmd_append(&cmd, "/nobreak");
+        cmd_run(&cmd);
+    }
+
+    nob_log(NOB_ERROR, "Timed out waiting for Android emulator boot completion");
+    return false;
 }

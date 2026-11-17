@@ -19,9 +19,23 @@ void slash_package_name(char *slashed, const char *package_name);
 const char *get_package_name(void);
 bool is_plugin_enabled(const char *plugin_name);
 bool validate_android_init(void);
+void append_build_defines(Cmd *cmd);
+void append_cli_hotreload_define(Cmd *cmd);
+
+extern bool cli_hotreload_enabled;
+extern int cli_argc;
+extern char **cli_argv;
 
 // Command helpers
 bool run_npm_command(const char *npm_cmd, bool background);
 bool run_android_emulator(const char *avd_name, int wait_seconds);
+
+// Android build mode helpers
+typedef enum {
+	ANDROID_BUILD_RELEASE,
+	ANDROID_BUILD_DEV,
+} Android_Build_Mode;
+
+void android_set_build_mode(Android_Build_Mode mode);
 
 #endif // COMMON_H_

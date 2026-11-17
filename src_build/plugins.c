@@ -1,7 +1,17 @@
 #include "plugins.h"
 #include "common.h"
+/* Ensure the nob header exposes the stripped-prefix typedefs used throughout
+    this file when compiled as a separate translation unit. Do NOT define
+    NOB_IMPLEMENTATION here. */
+#ifndef NOB_STRIP_PREFIX
+#define NOB_STRIP_PREFIX
+#endif
+#ifndef NOB_H_
+#include "../thirdparty/nob.h"
+#endif
 #include <string.h>
 #include <ctype.h>
+#include <stdio.h>
 
 // ============================================================================
 // Plugin Source Discovery

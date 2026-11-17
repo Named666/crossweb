@@ -4,6 +4,12 @@
 // Plugins are auto-registered at load time via PLUG_REGISTER() macro.
 // No manual includes or registration calls needed here.
 // See plug.h for the registration system documentation.
+//
+// **Security Note:** All plugin invocations (via plug_invoke) originate from
+// the centralized IPC queue managed by ipc.c. This ensures:
+//   - Message validation has already occurred
+//   - Command format is verified (plugin.command)
+//   - Plugins cannot be called directly from untrusted contexts
 // ============================================================================
 
 #include "plug.h"
@@ -86,6 +92,12 @@ CROSSWEB_API void plug_init(webview_t wv) {
 
 CROSSWEB_API void plug_invoke(const char *cmd, const char *payload, RespondCallback respond) {
     fprintf(stderr, "plug_invoke: cmd=%s payload=%s\n", cmd ? cmd : "NULL", payload ? payload : "NULL");
+    
+    // **SECURITY BOUNDARY:** At this point, cmd has been:
+    //   - Validated for length by ipc.c (IPC_MAX_CMD_LEN)
+    //   - Unescaped and null-terminated
+    // We now validate the command format (namespace.command) before dispatch.
+    
     // Parse cmd, e.g., "fs.read" -> plugin "fs", subcmd "read"
     char *dot = strchr(cmd, '.');
     if (!dot) {
@@ -123,7 +135,7 @@ CROSSWEB_API void plug_emit(const char *event, const char *data) {
 
 CROSSWEB_API void plug_update(webview_t wv) {
     (void)wv;
-    // Intentionally minimal: the host owns IPC and calls plug_invoke directly.
+    // NEEDS TO BE IMPLEMENTED: Call plugin update hooks if any
 }
 
 CROSSWEB_API void *plug_pre_reload(void) { return NULL; }  // Hotreload hooks

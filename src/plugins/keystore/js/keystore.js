@@ -31,6 +31,13 @@ export async function keystoreEncrypt(hexPayload) {
   }
 }
 
+export async function keystoreGenerate() {
+  if (isNative()) return invokeNative('keystore.generate', '');
+  const bytes = new Uint8Array(32);
+  globalThis.crypto.getRandomValues(bytes);
+  return { ok: true, privateKey: toHex(bytes) };
+}
+
 export async function keystoreDecrypt(encryptedPayload) {
   if (isNative()) return invokeNative('keystore.decrypt', encryptedPayload);
   try {
@@ -62,4 +69,4 @@ export async function keystoreLoad() {
   }
 }
 
-export default { keystoreEncrypt, keystoreDecrypt, keystoreSave, keystoreLoad };
+export default { keystoreEncrypt, keystoreGenerate, keystoreDecrypt, keystoreSave, keystoreLoad };

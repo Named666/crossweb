@@ -1,7 +1,7 @@
 # Crossweb (Based on Musializer)
 
 > [!NOTE]
-> This project is a work-in-progress. It serves as both a demonstration application (Musializer) and a reference for the underlying **CrossWeb** framework.
+> This project is a work-in-progress. It serves as both a demonstration application and a reference for the underlying **CrossWeb** framework.
 
 **CrossWeb** is a lightweight, C-based framework for creating cross-platform desktop and mobile applications using modern web technologies for the user interface. It combines a native C backend with a webview container, offering direct access to native capabilities through a flexible plugin system.
 
@@ -49,7 +49,7 @@ The `nob` command-line interface provides a complete workflow for development an
 | Command           | Description                                                                     |
 | ----------------- | ------------------------------------------------------------------------------- |
 | **`nob init`**    | Initializes a new Vite-based web project in the `web/` directory. Run this first. |
-| **`nob dev`**     | Starts the Vite development server for the web UI.                              |
+| **`nob win dev`** | Starts the Vite development server and launches the Windows desktop app.        |
 | **`nob build`**   | Builds the production-ready web assets in `web/dist/`.                          |
 | **`nob config`**  | Modifies the build configuration (`build/config.h`).                            |
 | **`./nob`**       | Compiles the native desktop application for the host OS.                        |
@@ -59,8 +59,9 @@ The `nob` command-line interface provides a complete workflow for development an
 | Command                      | Description                                                                                          |
 | ---------------------------- | ---------------------------------------------------------------------------------------------------- |
 | **`nob android init`**       | Generates an Android project in the `android/` directory from a template.                            |
-| **`nob android dev`**        | Runs the app on a connected Android device/emulator, using the live Vite server for the web UI.        |
+| **`nob android dev`**        | Starts Vite, builds a debug APK pointed at the dev server, then installs and launches it on the emulator. |
 | **`nob android build`**      | Compiles and bundles the web assets, C plugins, and Kotlin code into a release-signed APK.             |
+| **`nob android build dev`**  | Builds a debug APK that loads the web UI from the local Vite server for fast iteration.                |
 | **`nob android run`**        | Installs and launches the release APK on a connected device/emulator.                                  |
 | **`nob android install`**    | Installs the release APK without launching it.                                                       |
 
@@ -99,6 +100,10 @@ The `nob` command-line interface provides a complete workflow for development an
     - Build a release APK:
       ```sh
       ./nob.exe android build
+      ```
+    - Or build a debug APK that points at the local Vite server:
+      ```sh
+      ./nob.exe android build dev
       ```
     - Run the app on an emulator or device:
       ```sh

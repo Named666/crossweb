@@ -1,0 +1,9 @@
+src/plugins/<plugin-name>/
+├── lib.c
+├── plugin.h
+├── desktop.c
+├── mobile.c
+├── android/
+├── ios/
+├── js/
+└── permissions/

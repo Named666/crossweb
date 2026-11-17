@@ -27,6 +27,25 @@ static HWND g_webauthn_hwnd = NULL;
 #include <jni.h>
 #endif
 
+static const unsigned char SECP256K1_ORDER[32] = {
+    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfe,
+    0xba, 0xae, 0xdc, 0xe6, 0xaf, 0x48, 0xa0, 0x3b,
+    0xbf, 0xd2, 0x5e, 0x8c, 0xd0, 0x36, 0x41, 0x41
+};
+
+static bool is_valid_secp256k1_secret(const unsigned char *secret) {
+    bool nonzero = false;
+    int comparison = 0;
+    for (size_t i = 0; i < 32; ++i) {
+        nonzero = nonzero || secret[i] != 0;
+        if (comparison == 0 && secret[i] != SECP256K1_ORDER[i]) {
+            comparison = secret[i] < SECP256K1_ORDER[i] ? -1 : 1;
+        }
+    }
+    return nonzero && comparison < 0;
+}
+
 // Forward declarations for JNI bridge (to be implemented in Android)
 #ifdef __ANDROID__
 bool android_keystore_invoke(const char *cmd, const char *payload, RespondCallback respond);
@@ -46,6 +65,21 @@ static bool keystore_init(PluginContext *ctx) {
 }
 
 #ifdef _WIN32
+static bool generate_secp256k1_secret(unsigned char secret[32]) {
+    HCRYPTPROV hProv = 0;
+    if (!CryptAcquireContext(&hProv, NULL, NULL, PROV_RSA_FULL, CRYPT_VERIFYCONTEXT)) {
+        return false;
+    }
+    for (int attempt = 0; attempt < 128; ++attempt) {
+        if (CryptGenRandom(hProv, 32, secret) && is_valid_secp256k1_secret(secret)) {
+            CryptReleaseContext(hProv, 0);
+            return true;
+        }
+    }
+    CryptReleaseContext(hProv, 0);
+    return false;
+}
+
 static HWND webauthn_get_hwnd(void) {
     if (g_webauthn_hwnd != NULL) {
         return g_webauthn_hwnd;
@@ -365,6 +399,25 @@ static bool keystore_invoke(const char *cmd, const char *payload, RespondCallbac
 
     const char *in = payload ? payload : "";
 
+    if (strcmp(cmd, "generate") == 0) {
+        unsigned char secret[32];
+        if (!generate_secp256k1_secret(secret)) {
+            respond("{\"ok\":false,\"msg\":\"failed to generate valid secp256k1 secret\"}");
+            return false;
+        }
+        char hex[65];
+        static const char digits[] = "0123456789abcdef";
+        for (size_t i = 0; i < sizeof(secret); ++i) {
+            hex[i * 2] = digits[secret[i] >> 4];
+            hex[i * 2 + 1] = digits[secret[i] & 0x0f];
+        }
+        hex[64] = '\0';
+        char response[128];
+        snprintf(response, sizeof(response), "{\"ok\":true,\"privateKey\":\"%s\"}", hex);
+        respond(response);
+        return true;
+    }
+
     if (strcmp(cmd, "encrypt") == 0) {
         {
             char err[256] = {0};
@@ -664,8 +717,15 @@ bool android_keystore_invoke(const char *cmd, const char *payload, RespondCallba
         return false;
     }
     jobject context = (*current_env)->CallObjectMethod(current_env, current_obj, getContextMethod);
+    if ((*current_env)->ExceptionCheck(current_env)) {
+        (*current_env)->ExceptionClear(current_env);
+        respond("{\"ok\":false,\"msg\":\"Failed to get Android context\"}");
+        (*current_env)->DeleteLocalRef(current_env, ipcClass);
+        return false;
+    }
     if (context == NULL) {
         respond("{\"ok\":false,\"msg\":\"Failed to get context\"}");
+        (*current_env)->DeleteLocalRef(current_env, ipcClass);
         return false;
     }
 
@@ -726,12 +786,44 @@ bool android_keystore_invoke(const char *cmd, const char *payload, RespondCallba
         }
     }
 
+    jmethodID generateMethod = (*current_env)->GetStaticMethodID(current_env, keystoreClass, "generate", "()Ljava/lang/String;");
     jmethodID encryptMethod = (*current_env)->GetStaticMethodID(current_env, keystoreClass, "encrypt", "([B)Ljava/lang/String;");
     jmethodID decryptMethod = (*current_env)->GetStaticMethodID(current_env, keystoreClass, "decrypt", "(Ljava/lang/String;)[B");
     jmethodID saveMethod = (*current_env)->GetStaticMethodID(current_env, keystoreClass, "save", "(Landroid/content/Context;Ljava/lang/String;)V");
     jmethodID loadMethod = (*current_env)->GetStaticMethodID(current_env, keystoreClass, "load", "(Landroid/content/Context;)Ljava/lang/String;");
 
-    if (strcmp(cmd, "encrypt") == 0) {
+    if ((*current_env)->ExceptionCheck(current_env)) {
+        (*current_env)->ExceptionClear(current_env);
+        respond("{\"ok\":false,\"msg\":\"Keystore method lookup failed\"}");
+        (*current_env)->DeleteLocalRef(current_env, keystoreClass);
+        (*current_env)->DeleteLocalRef(current_env, ipcClass);
+        return false;
+    }
+
+    if (strcmp(cmd, "generate") == 0) {
+        jstring generated = (jstring)(*current_env)->CallStaticObjectMethod(current_env, keystoreClass, generateMethod);
+        if ((*current_env)->ExceptionCheck(current_env)) {
+            (*current_env)->ExceptionClear(current_env);
+            respond("{\"ok\":false,\"msg\":\"Key generation failed\"}");
+            (*current_env)->DeleteLocalRef(current_env, keystoreClass);
+            (*current_env)->DeleteLocalRef(current_env, ipcClass);
+            (*current_env)->DeleteLocalRef(current_env, context);
+            return false;
+        }
+        if (generated == NULL) {
+            respond("{\"ok\":false,\"msg\":\"Key generation failed\"}");
+            (*current_env)->DeleteLocalRef(current_env, keystoreClass);
+            (*current_env)->DeleteLocalRef(current_env, ipcClass);
+            (*current_env)->DeleteLocalRef(current_env, context);
+            return false;
+        }
+        const char *generatedStr = (*current_env)->GetStringUTFChars(current_env, generated, NULL);
+        char response[128];
+        snprintf(response, sizeof(response), "{\"ok\":true,\"privateKey\":\"%s\"}", generatedStr);
+        (*current_env)->ReleaseStringUTFChars(current_env, generated, generatedStr);
+        (*current_env)->DeleteLocalRef(current_env, generated);
+        respond(response);
+    } else if (strcmp(cmd, "encrypt") == 0) {
         size_t len = strlen(payload) / 2;
         jbyteArray bytes = (*current_env)->NewByteArray(current_env, (jsize)len);
         jbyte *tmp = malloc(len);
@@ -745,6 +837,13 @@ bool android_keystore_invoke(const char *cmd, const char *payload, RespondCallba
 
         jstring encrypted = (jstring)(*current_env)->CallStaticObjectMethod(current_env, keystoreClass, encryptMethod, bytes);
         (*current_env)->DeleteLocalRef(current_env, bytes);
+        if ((*current_env)->ExceptionCheck(current_env)) {
+            (*current_env)->ExceptionClear(current_env);
+            respond("{\"ok\":false,\"msg\":\"Encryption failed\"}");
+            (*current_env)->DeleteLocalRef(current_env, keystoreClass);
+            (*current_env)->DeleteLocalRef(current_env, ipcClass);
+            return false;
+        }
         if (encrypted == NULL) {
             respond("{\"ok\":false,\"msg\":\"Encryption failed\"}");
             (*current_env)->DeleteLocalRef(current_env, keystoreClass);
@@ -760,6 +859,13 @@ bool android_keystore_invoke(const char *cmd, const char *payload, RespondCallba
         jstring encrypted = (*current_env)->NewStringUTF(current_env, payload);
         jbyteArray decryptedBytes = (jbyteArray)(*current_env)->CallStaticObjectMethod(current_env, keystoreClass, decryptMethod, encrypted);
         (*current_env)->DeleteLocalRef(current_env, encrypted);
+        if ((*current_env)->ExceptionCheck(current_env)) {
+            (*current_env)->ExceptionClear(current_env);
+            respond("{\"ok\":false,\"msg\":\"Decryption failed\"}");
+            (*current_env)->DeleteLocalRef(current_env, keystoreClass);
+            (*current_env)->DeleteLocalRef(current_env, ipcClass);
+            return false;
+        }
         if (decryptedBytes == NULL) {
             respond("{\"ok\":false,\"msg\":\"Decryption failed\"}");
             (*current_env)->DeleteLocalRef(current_env, keystoreClass);
@@ -782,9 +888,25 @@ bool android_keystore_invoke(const char *cmd, const char *payload, RespondCallba
         jstring encrypted = (*current_env)->NewStringUTF(current_env, payload);
         (*current_env)->CallStaticVoidMethod(current_env, keystoreClass, saveMethod, context, encrypted);
         (*current_env)->DeleteLocalRef(current_env, encrypted);
+        if ((*current_env)->ExceptionCheck(current_env)) {
+            (*current_env)->ExceptionClear(current_env);
+            respond("{\"ok\":false,\"msg\":\"Failed to save keystore\"}");
+            (*current_env)->DeleteLocalRef(current_env, keystoreClass);
+            (*current_env)->DeleteLocalRef(current_env, ipcClass);
+            (*current_env)->DeleteLocalRef(current_env, context);
+            return false;
+        }
         respond("{\"ok\":true}");
     } else if (strcmp(cmd, "load") == 0) {
         jstring loaded = (jstring)(*current_env)->CallStaticObjectMethod(current_env, keystoreClass, loadMethod, context);
+        if ((*current_env)->ExceptionCheck(current_env)) {
+            (*current_env)->ExceptionClear(current_env);
+            respond("{\"ok\":false,\"msg\":\"Failed to load keystore\"}");
+            (*current_env)->DeleteLocalRef(current_env, keystoreClass);
+            (*current_env)->DeleteLocalRef(current_env, ipcClass);
+            (*current_env)->DeleteLocalRef(current_env, context);
+            return false;
+        }
         if (loaded != NULL) {
             const char *loadedStr = (*current_env)->GetStringUTFChars(current_env, loaded, NULL);
             char response[2048];
@@ -797,6 +919,14 @@ bool android_keystore_invoke(const char *cmd, const char *payload, RespondCallba
         }
     } else if (strcmp(cmd, "get") == 0) {
         jstring loaded = (jstring)(*current_env)->CallStaticObjectMethod(current_env, keystoreClass, loadMethod, context);
+        if ((*current_env)->ExceptionCheck(current_env)) {
+            (*current_env)->ExceptionClear(current_env);
+            respond("{\"ok\":false,\"msg\":\"Failed to load keystore\"}");
+            (*current_env)->DeleteLocalRef(current_env, keystoreClass);
+            (*current_env)->DeleteLocalRef(current_env, ipcClass);
+            (*current_env)->DeleteLocalRef(current_env, context);
+            return false;
+        }
         if (loaded != NULL) {
             const char *loadedStr = (*current_env)->GetStringUTFChars(current_env, loaded, NULL);
             char response[2048];
@@ -813,6 +943,7 @@ bool android_keystore_invoke(const char *cmd, const char *payload, RespondCallba
 
     (*current_env)->DeleteLocalRef(current_env, keystoreClass);
     (*current_env)->DeleteLocalRef(current_env, ipcClass);
+    (*current_env)->DeleteLocalRef(current_env, context);
     return true;
 }
 #endif

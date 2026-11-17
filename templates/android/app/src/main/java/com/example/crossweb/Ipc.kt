@@ -3,24 +3,27 @@ package {{PACKAGE_NAME}}
 import android.webkit.*
 import android.util.Log
 import kotlin.jvm.JvmStatic
+import org.json.JSONObject
+import androidx.annotation.Keep
 
 import androidx.appcompat.app.AppCompatActivity
 
 class Ipc(val webView: WebView) {
-        private var activity: AppCompatActivity? = null
+    private var activity: AppCompatActivity? = null
 
-        fun setActivity(act: AppCompatActivity) {
-            activity = act
-            staticActivity = act
-        }
+    fun setActivity(act: AppCompatActivity) {
+        activity = act
+        staticActivity = act
+    }
 
-        fun getContext(): android.content.Context {
-            return activity!!
-        }
+    fun getContext(): android.content.Context {
+        return activity!!
+    }
 
-        fun getActivity(): AppCompatActivity {
-            return activity!!
-        }
+    fun getActivity(): AppCompatActivity {
+        return activity!!
+    }
+
     @JavascriptInterface
     fun postMessage(message: String?) {
         message?.let { m ->
@@ -29,29 +32,50 @@ class Ipc(val webView: WebView) {
         }
     }
 
+    // Called from JS with JSON string: {id, cmd, payload}
     @JavascriptInterface
-    fun invoke(cmd: String, payload: String): String {
-        val id = java.util.UUID.randomUUID().toString()
-        Log.d("{{APP_NAME}}", "invoke called with cmd: $cmd, payload: $payload")
-        nativeInvoke(id, cmd, payload)
-        return id
-    }
-
-    fun resolveInvoke(id: String, result: String) {
-        Log.d("{{APP_NAME}}", "resolveInvoke called with result: $result")
-        // Send back to JS with id
-        val safeResult = result.replace("'", "\\'").replace("\n", "").replace("\r", "")
-        webView.post {
-            webView.evaluateJavascript("window.external.onMessage('$id', JSON.parse('$safeResult'))", null)
+    fun invoke(message: String) {
+        try {
+            val json = JSONObject(message)
+            val id = json.getString("id")
+            val cmd = json.getString("cmd")
+            val payload = if (json.isNull("payload")) "" else json.optString("payload", json.optJSONObject("payload")?.toString() ?: "")
+            
+            Log.d("{{APP_NAME}}", "invoke called with id: $id, cmd: $cmd, payload: $payload")
+            nativeInvoke(id, cmd, payload)
+        } catch (e: Exception) {
+            Log.e("{{APP_NAME}}", "Failed to parse invoke message: $message", e)
         }
     }
 
+    @Keep
+    fun resolveInvoke(id: String, result: String) {
+        if (result.contains("\"error\"")) {
+            Log.e("{{APP_NAME}}", "IPC/plugin error (id=$id): $result")
+        } else {
+            Log.d("{{APP_NAME}}", "resolveInvoke called with result: $result")
+        }
+        // Escape for JS string embedding
+        val safeId = org.json.JSONObject.quote(id)
+        val safeResult = org.json.JSONObject.quote(result)
+        webView.post {
+            webView.evaluateJavascript(
+                "if(window.external&&window.external.onMessage){window.external.onMessage(JSON.parse($safeId),JSON.parse($safeResult));}",
+                null
+            )
+        }
+    }
+
+    @Keep
     fun emit(event: String, data: String) {
         Log.d("{{APP_NAME}}", "emit called with event: $event, data: $data")
-        // Send event to JS asynchronously
-        val safeData = data.replace("'", "\\'").replace("\n", "").replace("\r", "")
+        val safeEvent = event.replace("\\", "\\\\").replace("\"", "\\\"")
+        val safeData = data.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r")
         webView.post {
-            webView.evaluateJavascript("if (window.external.onEvent) window.external.onEvent('$event', JSON.parse('$safeData'))", null)
+            webView.evaluateJavascript(
+                "if(window.external&&window.external.onEvent){window.external.onEvent(\"$safeEvent\",JSON.parse(\"$safeData\"));}",
+                null
+            )
         }
     }
 
@@ -62,6 +86,8 @@ class Ipc(val webView: WebView) {
         public fun getStaticActivity(): AppCompatActivity? = staticActivity
     }
 
+    @Keep
     private external fun ipc(url: String, message: String)
+    @Keep
     private external fun nativeInvoke(id: String, cmd: String, payload: String)
 }

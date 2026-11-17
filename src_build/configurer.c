@@ -33,7 +33,7 @@ typedef struct {
 static Target_Flag target_flags[] = {
     {
         .macro = "CROSSWEB_TARGET_WIN64_GCC",
-        .name = "win64-gcc",
+        .name = "win",
         .enabled_by_default = true,
     },
     {
@@ -54,11 +54,6 @@ static Target_Flag target_flags[] = {
     {
         .macro = "CROSSWEB_TARGET_ANDROID",
         .name = "android",
-        .enabled_by_default = false,
-    },
-    {
-        .macro = "CROSSWEB_TARGET_IOS",
-        .name = "ios",
         .enabled_by_default = false,
     },
 };

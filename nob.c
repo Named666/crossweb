@@ -10,15 +10,6 @@ int main(int argc, char **argv)
 {
     NOB_GO_REBUILD_URSELF_PLUS(argc, argv, "./thirdparty/nob.h", "./src_build/configurer.c", "./src_build/nob_cli.c");
     const char *target_string = NULL;
-    int config_exists = file_exists(CONFIG_PATH);
-    if (config_exists < 0) return 1;
-    if (config_exists == 0) {
-        if (!generate_default_config(CONFIG_PATH)) return 1;
-    } else {
-        nob_log(INFO, "file `%s` already exists", CONFIG_PATH);
-    }
-
-    if (!generate_config_logger("build/config_logger.c")) return 1;
 
     int cli_result = nob_cli_main(argc, argv);
     if (cli_result == 1) return 1; // CLI signaled error
@@ -27,10 +18,12 @@ int main(int argc, char **argv)
     if (cli_result != 2) {
         // cli_result returned a build target as a string (i.e. "CROSSWEB_TARGET_WIN64_GCC")
         // Append "-D " to the beginning of the  cli_result string
-        target_string = nob_temp_sprintf("./src_build/nob_stage2.c -D %s", cli_result);
+        target_string = nob_temp_sprintf("./src_build/nob_stage2.c -D %s%s", cli_result, cli_hotreload_enabled ? " -D CROSSWEB_HOTRELOAD=1" : "");
     } else {
-        // Default target if none specified
-        target_string = "./src_build/nob_stage2.c";
+        // The CLI owns the default target and feature definitions.
+        target_string = cli_hotreload_enabled
+            ? "./src_build/nob_stage2.c -D CROSSWEB_TARGET_WIN64_GCC -D CROSSWEB_HOTRELOAD=1"
+            : "./src_build/nob_stage2.c -D CROSSWEB_TARGET_WIN64_GCC";
     }
 
 
@@ -42,7 +35,7 @@ int main(int argc, char **argv)
 
     // Then invoke the freshly built stage2 binary with the original argv
     cmd_append(&cmd, stage2_binary);
-    da_append_many(&cmd, argv, argc);
+    da_append_many(&cmd, cli_argv, cli_argc);
     if (!cmd_run(&cmd)) return 1;
 
     return 0;

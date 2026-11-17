@@ -1,0 +1,5 @@
+1. The web app calls window.external.invoke("dialog.open", {...})
+2. The host IPC layer routes the message to the core runtime
+3. The core dispatches the command to the matching plugin
+4. The plugin performs the native operation or delegates to Android/Kotlin or future Swift code
+5. The plugin returns a JSON result to the webview

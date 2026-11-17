@@ -4,7 +4,8 @@
 #define NOGDI
 #define NOUSER
 #include <windows.h>
-
+#define NOB_STRIP_PREFIX
+#include "nob.h"
 #include "hotreload.h"
 #include "common.h"
 #include "plugins.h"

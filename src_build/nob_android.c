@@ -2,6 +2,24 @@
 #include "common.h"
 #include "plugins.h"
 
+static Android_Build_Mode android_build_mode = ANDROID_BUILD_RELEASE;
+
+void android_set_build_mode(Android_Build_Mode mode) {
+    android_build_mode = mode;
+}
+
+static bool configure_main_activity_for_mode(const char *main_activity_path) {
+    if (android_build_mode == ANDROID_BUILD_DEV) {
+        if (!replace_all_in_file(main_activity_path, "webView.loadUrl(\"https://appassets.androidplatform.net/index.html\")", "webView.loadUrl(\"http://10.0.2.2:5173\")")) return false;
+        if (!replace_all_in_file(main_activity_path, "webView.loadUrl(\"http://localhost:5173\")", "webView.loadUrl(\"http://10.0.2.2:5173\")")) return false;
+        return true;
+    }
+
+    if (!replace_all_in_file(main_activity_path, "webView.loadUrl(\"http://10.0.2.2:5173\")", "webView.loadUrl(\"https://appassets.androidplatform.net/index.html\")")) return false;
+    if (!replace_all_in_file(main_activity_path, "webView.loadUrl(\"http://localhost:5173\")", "webView.loadUrl(\"https://appassets.androidplatform.net/index.html\")")) return false;
+    return true;
+}
+
 bool collect_c_files(const char *dir, Nob_File_Paths *files, const char *base) {
     Nob_File_Paths entries = {0};
     if (!read_entire_dir(dir, &entries)) return false;
@@ -60,6 +78,32 @@ bool generate_cmake_lists(const char *path) {
     fprintf(f, "\tcrossweb\n");
     fprintf(f, "\t${log-lib}\n");
     fprintf(f, ")\n");
+    fprintf(f, "\ntarget_compile_definitions(crossweb PRIVATE\n");
+    fprintf(f, "\tCROSSWEB_BUILDING_PLUG=1\n");
+#ifdef CROSSWEB_HOTRELOAD
+    fprintf(f, "\tCROSSWEB_HOTRELOAD=1\n");
+#endif
+#ifdef CROSSWEB_UNBUNDLE
+    fprintf(f, "\tCROSSWEB_UNBUNDLE=1\n");
+#endif
+#ifdef CROSSWEB_TARGET_ANDROID
+    fprintf(f, "\tCROSSWEB_TARGET_ANDROID=1\n");
+#endif
+    Nob_File_Paths plugins = {0};
+    if (nob_read_entire_dir("src/plugins", &plugins)) {
+        for (size_t i = 0; i < plugins.count; ++i) {
+            const char *plugin_name = plugins.items[i];
+            if (strcmp(plugin_name, ".") == 0 || strcmp(plugin_name, "..") == 0) continue;
+            char macro[256];
+            snprintf(macro, sizeof(macro), "CROSSWEB_PLUGIN_%s", plugin_name);
+            for (size_t j = strlen("CROSSWEB_PLUGIN_"); j < strlen(macro); ++j) {
+                macro[j] = (char)toupper((unsigned char)macro[j]);
+            }
+            fprintf(f, "\t%s=1\n", macro);
+        }
+        da_free(plugins);
+    }
+    fprintf(f, ")\n");
     fclose(f);
     return true;
 }
@@ -80,29 +124,31 @@ bool build_dist(void) {
     char main_activity_path[1024];
     sprintf(main_activity_path, "android/app/src/main/java/%s/MainActivity.kt", package_path);
 
-    Nob_Cmd cmd = {0};
-    nob_cmd_append(&cmd, "cmd");
-    nob_cmd_append(&cmd, "/c");
-    nob_cmd_append(&cmd, "cd");
-    nob_cmd_append(&cmd, "web");
-    nob_cmd_append(&cmd, "&&");
-    nob_cmd_append(&cmd, "npm");
-    nob_cmd_append(&cmd, "run");
-    nob_cmd_append(&cmd, "build");
-    if (!nob_cmd_run_sync(cmd)) { nob_cmd_free(cmd); return false; }
-    nob_cmd_free(cmd);
+    if (android_build_mode == ANDROID_BUILD_RELEASE) {
+        Nob_Cmd cmd = {0};
+        nob_cmd_append(&cmd, "cmd");
+        nob_cmd_append(&cmd, "/c");
+        nob_cmd_append(&cmd, "cd");
+        nob_cmd_append(&cmd, "web");
+        nob_cmd_append(&cmd, "&&");
+        nob_cmd_append(&cmd, "npm");
+        nob_cmd_append(&cmd, "run");
+        nob_cmd_append(&cmd, "build");
+        if (!nob_cmd_run_sync(cmd)) { nob_cmd_free(cmd); return false; }
+        nob_cmd_free(cmd);
 
-    if (!mkdir_if_not_exists("android/app/src/main/assets")) return false;
-    Nob_Cmd copy_cmd = {0};
-    nob_cmd_append(&copy_cmd, "xcopy");
-    nob_cmd_append(&copy_cmd, "web\\dist\\*");
-    nob_cmd_append(&copy_cmd, "android\\app\\src\\main\\assets\\");
-    nob_cmd_append(&copy_cmd, "/s");
-    nob_cmd_append(&copy_cmd, "/y");
-    if (!nob_cmd_run_sync(copy_cmd)) { nob_cmd_free(copy_cmd); return false; }
-    nob_cmd_free(copy_cmd);
+        if (!mkdir_if_not_exists("android/app/src/main/assets")) return false;
+        Nob_Cmd copy_cmd = {0};
+        nob_cmd_append(&copy_cmd, "xcopy");
+        nob_cmd_append(&copy_cmd, "web\\dist\\*");
+        nob_cmd_append(&copy_cmd, "android\\app\\src\\main\\assets\\");
+        nob_cmd_append(&copy_cmd, "/e");
+        nob_cmd_append(&copy_cmd, "/y");
+        if (!nob_cmd_run_sync(copy_cmd)) { nob_cmd_free(copy_cmd); return false; }
+        nob_cmd_free(copy_cmd);
+    }
 
-    if (!replace_all_in_file(main_activity_path, "webView.loadUrl(\"http://localhost:5173\")", "webView.loadUrl(\"https://appassets.androidplatform.net/index.html\")")) return false;
+    if (!configure_main_activity_for_mode(main_activity_path)) return false;
 
     if (!mkdir_if_not_exists("android/app/src/main/c")) return false;
     if (!copy_file("src/android_bridge.c", "android/app/src/main/c/android_bridge.c")) return false;
@@ -115,7 +161,6 @@ bool build_dist(void) {
     if (!copy_file("src/ipc.c", "android/app/src/main/c/ipc.c")) return false;
     if (!copy_file("src/plug.h", "android/app/src/main/c/plug.h")) return false;
     if (!copy_file("src/ipc.h", "android/app/src/main/c/ipc.h")) return false;
-    if (!copy_file("build/config.h", "android/app/src/main/c/config.h")) return false;
 
     if (!mkdir_if_not_exists("android/app/src/main/c/plugins")) return false;
     if (!mkdir_if_not_exists("android/app/src/main/c/plugins/fs")) return false;
@@ -134,6 +179,11 @@ bool build_dist(void) {
     if (!replace_all_in_file("android/app/src/main/c/plugins/keystore/src/plugin.c", "__PACKAGE__", package_name)) return false;
     if (!copy_file("src/plugins/keystore/src/plugin.h", "android/app/src/main/c/plugins/keystore/src/plugin.h")) return false;
 
+    if (!mkdir_if_not_exists("android/app/src/main/c/plugins/nostr")) return false;
+    if (!mkdir_if_not_exists("android/app/src/main/c/plugins/nostr/src")) return false;
+    if (!copy_file("src/plugins/nostr/src/plugin.c", "android/app/src/main/c/plugins/nostr/src/plugin.c")) return false;
+    if (!copy_file("src/plugins/nostr/src/plugin.h", "android/app/src/main/c/plugins/nostr/src/plugin.h")) return false;
+
     if (!generate_cmake_lists("android/app/src/main/c/CMakeLists.txt")) return false;
     if (!generate_proguard_rules(package_name)) return false;
 
@@ -144,7 +194,7 @@ bool build_dist(void) {
     nob_cmd_append(&gradle_cmd, "android");
     nob_cmd_append(&gradle_cmd, "&&");
     nob_cmd_append(&gradle_cmd, "gradle");
-    nob_cmd_append(&gradle_cmd, "assembleRelease");
+    nob_cmd_append(&gradle_cmd, android_build_mode == ANDROID_BUILD_DEV ? "assembleDebug" : "assembleRelease");
     nob_cmd_append(&gradle_cmd, "--stacktrace");
     bool result = nob_cmd_run_sync(gradle_cmd);
     nob_cmd_free(gradle_cmd);

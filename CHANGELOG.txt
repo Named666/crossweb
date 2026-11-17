@@ -1,0 +1,32 @@
+v1.23.0 - Deprecated API pruning
+--------------------------------
+- Removed deprecated process/command helper functions from `thirdparty/nob.h`.
+	These helpers were kept for backwards compatibility but have clearer, safer
+	replacements. Migration steps are listed below.
+
+Migration guide
+- `nob_procs_wait_and_reset(procs)` -> Replace with `nob_procs_flush(&procs)`.
+	Example: `if (!nob_procs_flush(&procs)) { /* handle error */ }`
+
+- `nob_procs_append_with_flush(procs, proc, max)` -> Use
+	`nob_cmd_run(&cmd, .async = &procs, .max_procs = <integer>)` or explicitly
+	`nob_da_append(&procs, proc); if (procs.count >= max) nob_procs_flush(&procs);`
+
+- `nob_cmd_run_async(...)`, `nob_cmd_run_async_and_reset(...)`,
+	`nob_cmd_run_async_redirect(...)`, `nob_cmd_run_async_redirect_and_reset(...)`
+	-> Use `nob_cmd_run(&cmd, .async = &procs, .stdin_path = ..., .stdout_path = ..., .stderr_path = ...)`
+	which supports both async execution and redirection in a single call. If you
+	previously relied on the `_and_reset` helpers, call `cmd.count = 0` after
+	`nob_cmd_run()` where appropriate.
+
+- `nob_cmd_run_sync(...)`, `nob_cmd_run_sync_and_reset(...)`,
+	`nob_cmd_run_sync_redirect(...)`, `nob_cmd_run_sync_redirect_and_reset(...)`
+	-> Use `nob_cmd_run(&cmd)` with `.stdin_path`, `.stdout_path`, `.stderr_path`
+	for redirection. If you relied on the `_and_reset` variants, set `cmd.count = 0`
+	after calling `nob_cmd_run()`.
+
+Notes
+- Removed symbols were previously marked `NOB_DEPRECATED(...)`. The public
+	`nob_cmd_run()` / `nob_cmd_run_opt()` and `nob_procs_flush()` APIs provide
+	equivalent functionality with a simpler, consolidated interface.
+

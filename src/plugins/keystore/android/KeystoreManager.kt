@@ -11,6 +11,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import androidx.biometric.BiometricPrompt
 import androidx.biometric.BiometricManager
 import androidx.appcompat.app.AppCompatActivity
+import android.util.Log
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import java.security.KeyStore
@@ -21,6 +22,7 @@ import javax.crypto.spec.GCMParameterSpec
 import android.util.Base64
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
+import java.security.SecureRandom
 
 object KeystoreManager {
 
@@ -101,6 +103,26 @@ object KeystoreManager {
     // --- Helper implementations ---
     private const val GCM_TAG_LENGTH = 128 // bits
     private const val IV_LENGTH = 12 // bytes
+    // Lazy initialization - SecureRandom() can block for 30+ seconds on Android emulator
+    private val secureRandom by lazy { SecureRandom() }
+    private val secp256k1Order = java.math.BigInteger(
+        "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141",
+        16
+    )
+
+    @JvmStatic
+    fun generate(): String {
+        Log.d("Keystore", "generate() called")
+        val candidate = ByteArray(32)
+        Log.d("Keystore", "Generating random bytes...")
+        do {
+            secureRandom.nextBytes(candidate)
+        } while (java.math.BigInteger(1, candidate) == java.math.BigInteger.ZERO ||
+            java.math.BigInteger(1, candidate) >= secp256k1Order)
+        val result = candidate.joinToString("") { "%02x".format(it) }
+        Log.d("Keystore", "generate() returning: $result")
+        return result
+    }
 
     private fun authenticate() {
         val activity = activity ?: throw Exception("Activity not set")
@@ -141,7 +163,7 @@ object KeystoreManager {
         cipher.init(Cipher.ENCRYPT_MODE, getOrCreateAesKey())
         val encrypted = cipher.doFinal(privateKeyBytes)
         val iv = cipher.getIV()
-        return Base64.encodeToString(iv + encrypted, Base64.DEFAULT)
+        return Base64.encodeToString(iv + encrypted, Base64.NO_WRAP)
     }
 
     private fun decryptPrivateKey(encryptedBase64: String): ByteArray {

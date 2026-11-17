@@ -3,6 +3,14 @@
 
 #include <stdbool.h>
 
+/* Nob types used by plugin collection APIs */
+#ifndef NOB_STRIP_PREFIX
+#define NOB_STRIP_PREFIX
+#endif
+#ifndef NOB_H_
+#include "../thirdparty/nob.h"
+#endif
+
 // Platform types for plugin source collection
 typedef enum {
     PLATFORM_DESKTOP,   // Windows, macOS, Linux
